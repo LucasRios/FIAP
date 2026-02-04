@@ -1,6 +1,10 @@
 ## 1. O Front-end em IA
 
-Muitos alunos acreditam que front-end é “deixar bonito”. Explique que, em IA, front-end é a diferença entre experimento e produto: um notebook é uma prova de conceito; uma interface transforma hipótese em uso real. Três argumentos centrais:
+No desenvolvimento tradicional de modelos, o cientista de dados costuma habitar o ecossistema dos notebooks. Embora poderosos para experimentação, os notebooks são ambientes isolados. O Front-end para IA surge não apenas como uma "casca visual", mas como a ponte necessária para transformar um algoritmo em uma solução de negócio.
+
+Sem uma interface, seu modelo é uma "caixa preta": ninguém além de você sabe como ele funciona ou como extrair valor dele. Quando damos uma interface ao usuário, estamos democratizando o acesso à inteligência. Um Front-end bem estruturado permite o Human-in-the-loop, onde o feedback humano em tempo real (corrigindo uma predição, por exemplo) serve de combustível para o retreino e refinamento do modelo. Além disso, uma interface profissional transmite confiança e transparência, elementos cruciais em uma era onde a ética e a explicabilidade da IA são exigências de mercado. 
+
+Três argumentos centrais:
 
 • Caixa-Preta vs Produto — O notebook mostra comportamento; o produto entrega experiência, documentação, controles, logs e governança. O stakeholder interage, verifica hipóteses e toma decisões.
 
@@ -12,7 +16,9 @@ Conecte isso à aula: o objetivo não é fazer “UI bonita” por si só, mas c
 
 ---
 
-## 2. O Ecossistema de Ferramentas (20 min)
+## 2. O Ecossistema de Ferramentas
+
+Cada ferramenta no mercado resolve uma dor específica. Abaixo, detalhamos o panorama atual para que você saiba escolher a "arma" certa para cada batalha.
 
 ### Visão geral das principais ferramentas
 
@@ -21,6 +27,7 @@ Conecte isso à aula: o objetivo não é fazer “UI bonita” por si só, mas c
 | **Streamlit** | https://streamlit.io | Prototipagem rápida de dashboards de IA. Amplamente usado por times de Data Science. Adquirido pela Snowflake para acelerar produtos data-driven. |
 | **Gradio** | https://gradio.app | Criação rápida de demos de modelos ML. Muito usado pela Hugging Face para expor modelos públicos. |
 | **Dash (Plotly)** | https://dash.plotly.com | Dashboards analíticos corporativos. Utilizado em setores como saúde, finanças e indústria. |
+| **Chainlit** | https://chainlit.io/ | LangChain: Frequentemente usada para prototipar agentes que precisam de histórico de chat. |
 | **FastAPI** | https://fastapi.tiangolo.com | APIs de inferência de modelos em produção. Base de muitos sistemas de ML escaláveis. |
 | **Hugging Face Spaces** | https://huggingface.co/spaces | Hospedagem de demos de IA (Gradio / Streamlit) com fácil compartilhamento. |
 
@@ -87,6 +94,18 @@ if __name__ == "__main__":
 
 ```
 
+#### Dash — app mínimo
+```python
+
+import chainlit as cl
+
+@cl.on_message
+async def main(message: cl.Message):
+    # Onde a mágica do LLM acontece
+    await cl.Message(content=f"Recebi seu prompt: {message.content}").send()
+
+```
+
 #### FastAPI (API básica) + Next.js (fetch)
 ```python
 from fastapi import FastAPI
@@ -121,11 +140,14 @@ export default function Home() {
 ---
 ## 3. Streamlit — explicação e desafios
 
-Vantagens de começar por Streamlit:
+Escolhemos o Streamlit para iniciar esta jornada por um motivo simples: ele é a linguagem nativa do Cientista de Dados. Ele permite criar interfaces complexas usando apenas Python, sem a necessidade de aprender HTML, CSS ou JavaScript no primeiro momento.
 
-Curva de aprendizado curta: transforma scripts Python diretamente em UI; ideal para formar o hábito de “mostrar o que funciona”.
+O Poder e o Desafio do "Re-run"
+O Streamlit funciona sob um paradigma de execução linear. Sempre que um usuário interage com um botão ou slider, o script inteiro é executado do topo ao fim.
 
-Scripting linear: a API é orientada a chamadas diretas (st.sidebar, st.columns, st.metric) — ótimo para ensinar arquitetura de app antes de entrar em front-end moderno.
+A Vantagem: O estado da tela sempre reflete o estado das suas variáveis de código. É intuitivo.
+
+O Desafio: Imagine que seu modelo de IA demora 30 segundos para carregar. Se o usuário clicar em um botão de "Mudar cor do gráfico", você não quer esperar 30 segundos de novo. Esse é o grande gancho para a nossa Semana 4, onde aprenderemos sobre Caching e Performance para evitar que o app trave.
 
 Deploy simples: Cloud/Container/HF Spaces integram bem (rápida validação com stakeholders).
 
@@ -146,10 +168,9 @@ Transformar um script feio (imprime métricas) em um dashboard profissional em S
 
 Requisitos (instalação)
 ```python
-python -m venv .venv
-source .venv/bin/activate
-pip install streamlit pandas plotly scikit-learn
-
+pip install streamlit
+# Criar o arquivo
+touch app.py
 ```
 
 O Ponto de Partida (o “script feio”)
@@ -178,65 +199,38 @@ Estruturando com st.sidebar, st.columns, st.tabs
 - Tabs: Visão Geral / Métricas Detalhadas / Logs.
 
 ```python
-# app_streamlit_step1.py
 import streamlit as st
-import pandas as pd
-import numpy as np
-import time
 
-st.set_page_config(page_title="Dashboard IA - Aula 1", layout="wide")
+# setup principal da página
+st.set_page_config(page_title="IA Dashboard", layout="wide")
 
-# SIDEBAR - controles globais
-with st.sidebar:
-    st.header("Configurações")
-    modelo = st.selectbox("Modelo", ["bert-v1", "bert-v2", "xgboost-1"])
-    dataset = st.selectbox("Dataset", ["v1_clean", "v2_augmented"])
-    run = st.button("Rodar avaliação")
+st.sidebar.title("Configurações do Modelo")
+versao = st.sidebar.selectbox("Escolha a versão", ["v1.0", "v2.0"])
+st.sidebar.markdown("---")
+st.sidebar.write("Status do Servidor: **Online**")
 
-# Função que simula métricas (coloque sua lógica real aqui)
-@st.cache_data(ttl=60)
-def avaliar(modelo, dataset):
-    # simula cálculo custoso
-    time.sleep(1)
-    np.random.seed(hash(modelo+dataset) % 2**32)
-    accs = np.cumsum(np.random.rand(10) * 0.01) + 0.85
-    losses = np.linspace(0.5, 0.2, 10) + np.random.rand(10)*0.02
-    df = pd.DataFrame({"step": list(range(1,11)), "accuracy": accs, "loss": losses})
-    return df
+# Kpis em colunas
+st.title("Painel de Monitoramento de IA")
 
-# MAIN
-st.title("Dashboard de Métricas de IA — Aula 1")
-st.subheader(f"Modelo: {modelo} · Dataset: {dataset}")
+col1, col2, col3 = st.columns(3)
 
-# KPI em colunas
-col1, col2, col3 = st.columns([1,1,2])
-df = None
-if run:
-    df = avaliar(modelo, dataset)
-else:
-    st.info("Clique em 'Rodar avaliação' na sidebar para gerar métricas.")
+with col1:
+    st.metric(label="Precisão do Modelo", value="94.5%", delta="1.2%")
+with col2:
+    st.metric(label="Latência Média", value="85ms", delta="-5ms")
+with col3:
+    st.metric(label="Custo por 1k Tokens", value="$0.02", delta="0.005")
 
-if df is not None:
-    with col1:
-        st.metric("Acurácia (último)", f"{df['accuracy'].iloc[-1]:.3f}",
-                  delta=f"{(df['accuracy'].iloc[-1]-df['accuracy'].iloc[0]):+.3f}")
-    with col2:
-        st.metric("Loss (último)", f"{df['loss'].iloc[-1]:.3f}",
-                  delta=f"{(df['loss'].iloc[-1]-df['loss'].iloc[0]):+.3f}")
-    with col3:
-        st.line_chart(df.set_index("step")[["accuracy","loss"]])
+# Visualização em colunas
+tab_graficos, tab_logs = st.tabs(["Visualização", "Logs de Erro"])
 
-# Tabs
-tab1, tab2, tab3 = st.tabs(["Visão Geral","Métricas Detalhadas","Logs"])
-with tab1:
-    st.write("Resumo rápido da execução")
-with tab2:
-    st.dataframe(df)
-with tab3:
-    st.text("Logs de execução (simulados)")
-    st.write("- run_id: 1234")
-    st.write("- timestamp: 2025-02-04")
+with tab_graficos:
+    st.subheader("Distribuição de Predições")
+    st.image("https://via.placeholder.com/800x400.png?text=Grafico+Interativo+Aqui")
 
+with tab_logs:
+    st.code("ERROR: Model version returned timeout in 10ms")
+ 
 ```
 
 
@@ -248,4 +242,5 @@ with tab3:
 - [FastAPI](https://fastapi.tiangolo.com)  
 - [Next.JS](https://nextjs.org/?utm_source=chatgpt.com)
 - [huggingface](https://huggingface.co/spaces?utm_source=chatgpt.com)
+
 
