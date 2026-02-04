@@ -1,0 +1,51 @@
+# Aula 1 — O Rosto da Inteligência
+
+## 1. Abertura: Por que Front-end em IA? (15 min)
+
+É comum alunos associarem Front-end apenas à estética. Em projetos de IA, essa visão é limitante. Front-end é o que transforma um experimento técnico em um **produto utilizável**.
+
+Um modelo rodando em um Jupyter Notebook é apenas uma hipótese testada em ambiente controlado. Quando esse mesmo modelo ganha uma interface, ele passa a ser testável por clientes, gestores e usuários finais — pessoas que não programam, mas tomam decisões.
+
+Outro ponto central é **time-to-market**. Em IA, errar rápido é vantagem competitiva. Interfaces simples permitem validar hipóteses em dias, não meses. Um stakeholder consegue testar cenários, fornecer feedback e decidir se o modelo gera valor antes de grandes investimentos técnicos.
+
+Por fim, há o **ciclo de feedback**. Sem interface, não existe coleta estruturada de dados reais de uso. Sem dados reais, não há *human-in-the-loop*, nem melhoria contínua do modelo. O front-end passa a ser parte essencial da arquitetura de IA, não um detalhe visual.
+
+---
+
+## 2. O Ecossistema de Ferramentas (20 min)
+
+### Visão geral das principais ferramentas
+
+| Ferramenta | Site oficial | Casos de uso / exemplos reais |
+|-----------|--------------|-------------------------------|
+| **Streamlit** | https://streamlit.io | Prototipagem rápida de dashboards de IA. Amplamente usado por times de Data Science. Adquirido pela Snowflake para acelerar produtos data-driven. |
+| **Gradio** | https://gradio.app | Criação rápida de demos de modelos ML. Muito usado pela Hugging Face para expor modelos públicos. |
+| **Dash (Plotly)** | https://dash.plotly.com | Dashboards analíticos corporativos. Utilizado em setores como saúde, finanças e indústria. |
+| **FastAPI** | https://fastapi.tiangolo.com | APIs de inferência de modelos em produção. Base de muitos sistemas de ML escaláveis. |
+| **Next.js / React** | https://nextjs.org | Front-end moderno para produtos de IA complexos (ex: chatbots, copilots, plataformas SaaS). |
+| **Hugging Face Spaces** | https://huggingface.co/spaces | Hospedagem de demos de IA (Gradio / Streamlit) com fácil compartilhamento. |
+
+### Quando usar cada uma
+
+- **Validação rápida / demo interna:** Streamlit, Gradio  
+- **Portfólio público de IA:** Gradio + Hugging Face Spaces  
+- **Dashboards corporativos:** Dash  
+- **Produção e escala:** FastAPI + Front-end dedicado  
+- **Produtos completos de IA:** Next.js + API de inferência  
+
+---
+
+### Exemplos de código — até onde cada ferramenta pode chegar
+
+#### Streamlit — Dashboard simples de métricas
+```python
+import streamlit as st
+
+st.set_page_config(layout="wide")
+st.title("Dashboard de IA")
+
+col1, col2 = st.columns(2)
+col1.metric("Acurácia", "0.93", "+0.02")
+col2.metric("Loss", "0.21", "-0.04")
+
+st.line_chart({"accuracy": [0.85, 0.88, 0.91, 0.93]})
