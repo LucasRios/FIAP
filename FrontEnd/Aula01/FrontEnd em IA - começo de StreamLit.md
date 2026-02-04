@@ -1,5 +1,3 @@
-# Aula 1 — O Rosto da Inteligência
-
 ## 1. O Front-end em IA
 
 Muitos alunos acreditam que front-end é “deixar bonito”. Explique que, em IA, front-end é a diferença entre experimento e produto: um notebook é uma prova de conceito; uma interface transforma hipótese em uso real. Três argumentos centrais:
@@ -121,6 +119,128 @@ export default function Home() {
 }
 ```
 ---
+## 3. Streamlit — explicação e desafios
+
+Vantagens de começar por Streamlit:
+
+Curva de aprendizado curta: transforma scripts Python diretamente em UI; ideal para formar o hábito de “mostrar o que funciona”.
+
+Scripting linear: a API é orientada a chamadas diretas (st.sidebar, st.columns, st.metric) — ótimo para ensinar arquitetura de app antes de entrar em front-end moderno.
+
+Deploy simples: Cloud/Container/HF Spaces integram bem (rápida validação com stakeholders).
+
+Desafios e gancho para próxima aula (gancho técnico):
+
+Ciclo de re-run: Streamlit reexecuta o script do topo ao fim a cada interação. Se o código não estiver estruturado (caching, separação de funções, controle de estado) o app fica lento. Isso é tópico para a Semana 4 (optimizações, caching, arquitetura reativa).
+
+---
+## 4. Anatomia do Streamlit: O Ciclo de Re-run
+
+Explique a diferença chave: em apps web tradicionais o front-end preserva estado no cliente; em Streamlit a execução é sempre retornada ao topo do script e reexecução é controlada por caching e st.session_state. Demonstre com um exemplo mínimo (ver Workshop). Aponte problemas comuns: chamadas bloqueantes (requests/IO) no topo do script, criação de objetos pesados sem cache, loops de IO em cada interação.
+
+---
+
+## 5. Construindo o Dashboard de Métricas de IA
+
+Transformar um script feio (imprime métricas) em um dashboard profissional em Streamlit com sidebar, columns, tabs, métricas, gráficos e logs. Incluir técnicas de performance mínimas (cache, separação de funções).
+
+Requisitos (instalação)
+```python
+python -m venv .venv
+source .venv/bin/activate
+pip install streamlit pandas plotly scikit-learn
+
+```
+
+O Ponto de Partida (o “script feio”)
+```python
+# script_feio.py
+import random
+import time
+
+def avaliar():
+    time.sleep(1)  # simula inferência
+    return {"accuracy": random.uniform(0.6, 0.98),
+            "loss": random.uniform(0.1, 0.6)}
+
+if __name__ == "__main__":
+    print("Avaliando modelo...")
+    m = avaliar()
+    print("accuracy:", m["accuracy"])
+    print("loss:", m["loss"])
+
+```
+
+Estruturando com st.sidebar, st.columns, st.tabs
+
+- Sidebar: seleção de modelo/versão/dataset (controles globais).
+- Main: título, KPIs principais (usando st.metric) e gráficos (linha de tendência).
+- Tabs: Visão Geral / Métricas Detalhadas / Logs.
+
+```python
+# app_streamlit_step1.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+import time
+
+st.set_page_config(page_title="Dashboard IA - Aula 1", layout="wide")
+
+# SIDEBAR - controles globais
+with st.sidebar:
+    st.header("Configurações")
+    modelo = st.selectbox("Modelo", ["bert-v1", "bert-v2", "xgboost-1"])
+    dataset = st.selectbox("Dataset", ["v1_clean", "v2_augmented"])
+    run = st.button("Rodar avaliação")
+
+# Função que simula métricas (coloque sua lógica real aqui)
+@st.cache_data(ttl=60)
+def avaliar(modelo, dataset):
+    # simula cálculo custoso
+    time.sleep(1)
+    np.random.seed(hash(modelo+dataset) % 2**32)
+    accs = np.cumsum(np.random.rand(10) * 0.01) + 0.85
+    losses = np.linspace(0.5, 0.2, 10) + np.random.rand(10)*0.02
+    df = pd.DataFrame({"step": list(range(1,11)), "accuracy": accs, "loss": losses})
+    return df
+
+# MAIN
+st.title("Dashboard de Métricas de IA — Aula 1")
+st.subheader(f"Modelo: {modelo} · Dataset: {dataset}")
+
+# KPI em colunas
+col1, col2, col3 = st.columns([1,1,2])
+df = None
+if run:
+    df = avaliar(modelo, dataset)
+else:
+    st.info("Clique em 'Rodar avaliação' na sidebar para gerar métricas.")
+
+if df is not None:
+    with col1:
+        st.metric("Acurácia (último)", f"{df['accuracy'].iloc[-1]:.3f}",
+                  delta=f"{(df['accuracy'].iloc[-1]-df['accuracy'].iloc[0]):+.3f}")
+    with col2:
+        st.metric("Loss (último)", f"{df['loss'].iloc[-1]:.3f}",
+                  delta=f"{(df['loss'].iloc[-1]-df['loss'].iloc[0]):+.3f}")
+    with col3:
+        st.line_chart(df.set_index("step")[["accuracy","loss"]])
+
+# Tabs
+tab1, tab2, tab3 = st.tabs(["Visão Geral","Métricas Detalhadas","Logs"])
+with tab1:
+    st.write("Resumo rápido da execução")
+with tab2:
+    st.dataframe(df)
+with tab3:
+    st.text("Logs de execução (simulados)")
+    st.write("- run_id: 1234")
+    st.write("- timestamp: 2025-02-04")
+
+```
+
+
+---
 # Referências
 - [StreamLit](https://streamlit.io/?utm_source=chatgpt.com)  
 - [Gradio](https://gradio.app/?utm_source=chatgpt.com)  
@@ -128,3 +248,4 @@ export default function Home() {
 - [FastAPI](https://fastapi.tiangolo.com)  
 - [Next.JS](https://nextjs.org/?utm_source=chatgpt.com)
 - [huggingface](https://huggingface.co/spaces?utm_source=chatgpt.com)
+
