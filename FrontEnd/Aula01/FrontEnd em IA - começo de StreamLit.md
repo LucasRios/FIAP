@@ -12,8 +12,6 @@ Três argumentos centrais:
 
 • Ciclo de Feedback (Human-in-the-loop) — Sem interface não há coleta consistente de dados reais: rótulos, correções e sinais de uso. O front-end habilita captura de dados que alimentam retreinamento e melhoria contínua.
 
-Conecte isso à aula: o objetivo não é fazer “UI bonita” por si só, mas construir um produto mínimo que viabilize validação, coleta de sinal e priorização técnica.
-
 ---
 
 ## 2. O Ecossistema de Ferramentas
@@ -147,24 +145,23 @@ O Streamlit funciona sob um paradigma de execução linear. Sempre que um usuár
 
 A Vantagem: O estado da tela sempre reflete o estado das suas variáveis de código. É intuitivo.
 
-O Desafio: Imagine que seu modelo de IA demora 30 segundos para carregar. Se o usuário clicar em um botão de "Mudar cor do gráfico", você não quer esperar 30 segundos de novo. Esse é o grande gancho para a nossa Semana 4, onde aprenderemos sobre Caching e Performance para evitar que o app trave.
+O Desafio: Imagine que seu modelo de IA demora 30 segundos para carregar. Se o usuário clicar em um botão de "Mudar cor do gráfico", você não quer esperar 30 segundos de novo. Esse é o grande gancho para a nossa Semana 5, onde aprenderemos sobre Caching e Performance para evitar que o app trave.
 
 Deploy simples: Cloud/Container/HF Spaces integram bem (rápida validação com stakeholders).
 
-Desafios e gancho para próxima aula (gancho técnico):
-
-Ciclo de re-run: Streamlit reexecuta o script do topo ao fim a cada interação. Se o código não estiver estruturado (caching, separação de funções, controle de estado) o app fica lento. Isso é tópico para a Semana 4 (optimizações, caching, arquitetura reativa).
+Ciclo de re-run: Streamlit reexecuta o script do topo ao fim a cada interação. Se o código não estiver estruturado (caching, separação de funções, controle de estado) o app fica lento. Isso é tópico para a Semana 5 (optimizações, caching, arquitetura reativa).
 
 ---
 ## 4. Anatomia do Streamlit: O Ciclo de Re-run
 
-Explique a diferença chave: em apps web tradicionais o front-end preserva estado no cliente; em Streamlit a execução é sempre retornada ao topo do script e reexecução é controlada por caching e st.session_state. Demonstre com um exemplo mínimo (ver Workshop). Aponte problemas comuns: chamadas bloqueantes (requests/IO) no topo do script, criação de objetos pesados sem cache, loops de IO em cada interação.
+Em apps web tradicionais o front-end preserva estado no cliente; em Streamlit a execução é sempre retornada ao topo do script e reexecução é controlada por caching e st.session_state. 
+Problemas comuns: chamadas bloqueantes (requests/IO) no topo do script, criação de objetos pesados sem cache, loops de IO em cada interação.
 
 ---
 
 ## 5. Construindo o Dashboard de Métricas de IA
 
-Transformar um script feio (imprime métricas) em um dashboard profissional em Streamlit com sidebar, columns, tabs, métricas, gráficos e logs. Incluir técnicas de performance mínimas (cache, separação de funções).
+Transformando um script feio (imprime métricas) em um dashboard profissional em Streamlit com sidebar, columns, tabs, métricas, gráficos e logs. Incluir técnicas de performance mínimas (cache, separação de funções).
 
 Requisitos (instalação)
 ```python
@@ -242,5 +239,6 @@ with tab_logs:
 - [FastAPI](https://fastapi.tiangolo.com)  
 - [Next.JS](https://nextjs.org/?utm_source=chatgpt.com)
 - [huggingface](https://huggingface.co/spaces?utm_source=chatgpt.com)
+
 
 
