@@ -200,35 +200,47 @@ Estruturando com st.sidebar, st.columns, st.tabs
 - Tabs: Visão Geral / Métricas Detalhadas / Logs.
 
 ```python
-#importa o streamLit para podermos seguir com a programação normal no collab
+#importa o streamLit para podermos seguir com a programação normal  
 import streamlit as st
 
+# Configuração da página (Isso define o comportamento no browser)
+st.set_page_config(page_title="Minha IA", layout="wide",initial_sidebar_state="expanded", page_icon="🤖",menu_items={
+          'Get Help': 'https://www.extremelycoolapp.com/help',
+          'Report a bug': "https://www.extremelycoolapp.com/bug",
+         'About': "# This is a header. This is an *extremely* cool app!"
+     })
 
-#title para definir o título da interface
-st.title("Minha IA em Bloquinhos")
+st.title("Construindo Interfaces com IA")
 
+#1 - Comece pensando nas abas paa organizar as informações em seus contextos
+tab_home, tab_metricas = st.tabs(["Início", "Métricas"])
 
-#1 - Pense em abas para agrupar dados de contextos diferentes
-aba1, aba2 = st.tabs(["Interação", "Métricas da IA"])
-
-#construa cada aba com seu contexto
-with aba1:
-    #2 - dentro de cada aba pense em linhas
-    st.header("Entrada de Dados")    
-
-    # 3 - dentro de cada linha pense em colunas
-    col1, col2 = st.columns(2)
-    with col1:
-        st.file_uploader("Suba sua imagem")
-    with col2:
-        st.text_input("Comando para a IA")
+#com a primeira tab comece a pensar sobre o input e output
+with tab_home:
+    #2 - Dentro da primeira tab, pense em colunas. É interessante separar em colunas o que preciso pedir? ou melhor manter em uma lista inteira?
+    col_input, col_preview = st.columns([1, 1]) # Proporção das colunas
     
-    if st.button("Executar Modelo"):
-        st.info("Aqui apareceria a resposta do modelo!")
+    with col_input:
+      #3 - a partir da coluna, pense nas linhas, nas informações que você precisa pedir ou apresentar
+        st.subheader("Entrada")
+        upload = st.file_uploader("Suba uma imagem para análise", type=["jpg", "png"])
+        prompt = st.text_area("O que a IA deve procurar?")
+        botao = st.button("Analisar Agora")
 
-with aba2:
-    st.header("Performance")
-    st.metric(label="Confiança", value="98%", delta="2%")
+    with col_preview:
+        st.subheader("Saída da IA")
+        if botao:
+            st.success("Processamento concluído!")
+            # Simulação de saída
+            st.image("https://via.placeholder.com/400", caption="Resultado da Detecção")
+
+with tab_metricas:
+    #Métricas de Contexto
+    st.subheader("Métricas do Modelo")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Precisão", "92%", "+1.5%")
+    m2.metric("Tempo de Resposta", "0.8s", "-0.2s")
+    m3.metric("Uso de Memória", "450MB")
  
 ```
 
@@ -251,32 +263,40 @@ O mesmo código rodando no Collab
 #importa o streamLit para podermos seguir com a programação normal no collab
 import streamlit as st
 
+# Configuração da página (Isso define o comportamento no browser)
+st.set_page_config(page_title="Minha IA", layout="wide")
 
-#title para definir o título da interface
-st.title("Minha IA em Bloquinhos")
+st.title("Construindo Interfaces com IA")
 
+#1 - Comece pensando nas abas paa organizar as informações em seus contextos
+tab_home, tab_metricas = st.tabs(["Início", "Métricas"])
 
-#1 - Pense em abas para agrupar dados de contextos diferentes
-aba1, aba2 = st.tabs(["Interação", "Métricas da IA"])
-
-#construa cada aba com seu contexto
-with aba1:
-    #2 - dentro de cada aba pense em linhas
-    st.header("Entrada de Dados")    
-
-    # 3 - dentro de cada linha pense em colunas
-    col1, col2 = st.columns(2)
-    with col1:
-        st.file_uploader("Suba sua imagem")
-    with col2:
-        st.text_input("Comando para a IA")
+#com a primeira tab comece a pensar sobre o input e output
+with tab_home:
+    #2 - Dentro da primeira tab, pense em colunas. É interessante separar em colunas o que preciso pedir? ou melhor manter em uma lista inteira?
+    col_input, col_preview = st.columns([1, 1]) # Proporção das colunas
     
-    if st.button("Executar Modelo"):
-        st.info("Aqui apareceria a resposta do modelo!")
+    with col_input:
+      #3 - a partir da coluna, pense nas linhas, nas informações que você precisa pedir ou apresentar
+        st.subheader("Entrada")
+        upload = st.file_uploader("Suba uma imagem para análise", type=["jpg", "png"])
+        prompt = st.text_area("O que a IA deve procurar?")
+        botao = st.button("Analisar Agora")
 
-with aba2:
-    st.header("Performance")
-    st.metric(label="Confiança", value="98%", delta="2%")
+    with col_preview:
+        st.subheader("Saída da IA")
+        if botao:
+            st.success("Processamento concluído!")
+            # Simulação de saída
+            st.image("https://via.placeholder.com/400", caption="Resultado da Detecção")
+
+with tab_metricas:
+    #Métricas de Contexto
+    st.subheader("Métricas do Modelo")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Precisão", "92%", "+1.5%")
+    m2.metric("Tempo de Resposta", "0.8s", "-0.2s")
+    m3.metric("Uso de Memória", "450MB")
 
 ```
 
@@ -315,6 +335,7 @@ run_tunnel()
 - [FastAPI](https://fastapi.tiangolo.com)  
 - [Next.JS](https://nextjs.org/?utm_source=chatgpt.com)
 - [huggingface](https://huggingface.co/spaces?utm_source=chatgpt.com)
+
 
 
 
