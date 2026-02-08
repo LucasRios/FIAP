@@ -165,7 +165,11 @@ Transformando um script feio (imprime métricas) em um dashboard profissional em
 
 Requisitos (instalação)
 ```python
-pip install streamlit
+python -m venv venv
+```
+
+```python
+python -m pip install streamlit
 # Criar o arquivo
 touch app.py
 ```
@@ -196,40 +200,112 @@ Estruturando com st.sidebar, st.columns, st.tabs
 - Tabs: Visão Geral / Métricas Detalhadas / Logs.
 
 ```python
+#importa o streamLit para podermos seguir com a programação normal no collab
 import streamlit as st
 
-# setup principal da página
-st.set_page_config(page_title="IA Dashboard", layout="wide")
 
-st.sidebar.title("Configurações do Modelo")
-versao = st.sidebar.selectbox("Escolha a versão", ["v1.0", "v2.0"])
-st.sidebar.markdown("---")
-st.sidebar.write("Status do Servidor: **Online**")
+#title para definir o título da interface
+st.title("Minha IA em Bloquinhos")
 
-# Kpis em colunas
-st.title("Painel de Monitoramento de IA")
 
-col1, col2, col3 = st.columns(3)
+#1 - Pense em abas para agrupar dados de contextos diferentes
+aba1, aba2 = st.tabs(["Interação", "Métricas da IA"])
 
-with col1:
-    st.metric(label="Precisão do Modelo", value="94.5%", delta="1.2%")
-with col2:
-    st.metric(label="Latência Média", value="85ms", delta="-5ms")
-with col3:
-    st.metric(label="Custo por 1k Tokens", value="$0.02", delta="0.005")
+#construa cada aba com seu contexto
+with aba1:
+    #2 - dentro de cada aba pense em linhas
+    st.header("Entrada de Dados")    
 
-# Visualização em colunas
-tab_graficos, tab_logs = st.tabs(["Visualização", "Logs de Erro"])
+    # 3 - dentro de cada linha pense em colunas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.file_uploader("Suba sua imagem")
+    with col2:
+        st.text_input("Comando para a IA")
+    
+    if st.button("Executar Modelo"):
+        st.info("Aqui apareceria a resposta do modelo!")
 
-with tab_graficos:
-    st.subheader("Distribuição de Predições")
-    st.image("https://via.placeholder.com/800x400.png?text=Grafico+Interativo+Aqui")
-
-with tab_logs:
-    st.code("ERROR: Model version returned timeout in 10ms")
+with aba2:
+    st.header("Performance")
+    st.metric(label="Confiança", value="98%", delta="2%")
  
 ```
 
+O mesmo código rodando no Collab
+
+```python
+
+#instalar o Streamlit e o cloudflared (que vai "expor" o servidor do Colab para a internet)
+!pip install -q streamlit
+!wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+!dpkg -i cloudflared-linux-amd64.deb
+
+```
+
+```python
+
+#Escreve o app.py no collab para poder ter uma interface
+%%writefile app.py
+
+#importa o streamLit para podermos seguir com a programação normal no collab
+import streamlit as st
+
+
+#title para definir o título da interface
+st.title("Minha IA em Bloquinhos")
+
+
+#1 - Pense em abas para agrupar dados de contextos diferentes
+aba1, aba2 = st.tabs(["Interação", "Métricas da IA"])
+
+#construa cada aba com seu contexto
+with aba1:
+    #2 - dentro de cada aba pense em linhas
+    st.header("Entrada de Dados")    
+
+    # 3 - dentro de cada linha pense em colunas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.file_uploader("Suba sua imagem")
+    with col2:
+        st.text_input("Comando para a IA")
+    
+    if st.button("Executar Modelo"):
+        st.info("Aqui apareceria a resposta do modelo!")
+
+with aba2:
+    st.header("Performance")
+    st.metric(label="Confiança", value="98%", delta="2%")
+
+```
+
+```python
+
+import subprocess
+import threading
+import time
+
+def run_streamlit():
+    # Roda o streamlit na porta 8501
+    subprocess.Popen(["streamlit", "run", "app.py", "--server.port", "8501"])
+
+def run_tunnel():
+    # Cria o túnel da Cloudflare
+    p = subprocess.Popen(["cloudflared", "tunnel", "--url", "http://localhost:8501"], 
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for line in p.stdout:
+        if ".trycloudflare.com" in line:
+            print("\n--- SEU APP ESTÁ RODANDO NO LINK ABAIXO ---")
+            print(line.split("https://")[1].strip().split(" ")[0])
+            print("-------------------------------------------\n")
+
+# Inicia o Streamlit em uma thread e o túnel em outra
+threading.Thread(target=run_streamlit).start()
+time.sleep(5)
+run_tunnel()
+
+```
 
 ---
 # Referências
@@ -239,6 +315,7 @@ with tab_logs:
 - [FastAPI](https://fastapi.tiangolo.com)  
 - [Next.JS](https://nextjs.org/?utm_source=chatgpt.com)
 - [huggingface](https://huggingface.co/spaces?utm_source=chatgpt.com)
+
 
 
 
