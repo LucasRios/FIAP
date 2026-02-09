@@ -30,7 +30,7 @@ Em produtos digitais tradicionais, interfaces refletem resultados determinístic
 
 > Um classificador de imagens que retorna "Cachorro — 72% de confiança" deixa o usuário consciente que há chance de erro e reduz decisões erradas
 
-![Comparação entre sistemas determinísticos e probabilísticos](images/ux_tradicional_vs_ia.png)
+![Comparação entre sistemas determinísticos e probabilísticos](imagens/comparacao_deterministico_probabilistico.png)
 
 ---
 
@@ -57,7 +57,7 @@ A partir disso conseguimos pensar melhores práticas, princípios e elementos qu
 * Métricas de confiança.
 * Labels claros como "Resultado estimado" e "Probabilidade".
 
-![Card de resultado com explicação e barra de confiança](images/transparencia_explainability.png)
+![Card de resultado com explicação e barra de confiança](imagens/transparencia_explainability.png)
 
 **Exemplo no StreamLit:**
 
@@ -91,7 +91,7 @@ Como mencionado no começo, a interface em sistemas de IA trabalham com resultad
 
 A interface deve proteger o usuário quando o modelo está incerto, incentivando revisão humana. (Human-in-the-loop)
 
-![Estados de confiança: alta, média e baixa](images/gestao_incerteza.png)
+![Estados de confiança: alta, média e baixa](imagens/gestao_de_expectativa_e_incerteza.png)
 
 ---
 
@@ -112,7 +112,7 @@ with st.spinner("Analisando a imagem e extraindo características..."):
 st.success("Análise concluída")
 ```
 
-![Exemplo de loading e feedback visual](images/latencia_feedback.png)
+![Exemplo de loading e feedback visual](imagens/design_latencia.png)
 
 ---
 
@@ -132,7 +132,7 @@ UX também é um mecanismo de coleta de dados com os usuários.
 * Pergunta direta: "A IA acertou?"
 * Logs de erro baseados em UI. Lista simples ou detalhada sobre os erros gerados pela IA a partir de determinadas entradas do usuário.
 
-![Exemplo de feedback humano na interface](images/human_in_the_loop.png)
+![Exemplo de feedback humano na interface](imagens/huma_in_the_loop.png)
 
 ---
 
@@ -152,7 +152,7 @@ Lembre-se: Deixe o trabalho visual com o Designer. O importante no FrontEnd em i
 * Previsibilidade
 * Reuso de padrões
 
-![Camadas de um design system](images/design_system_anatomia.png)
+![Camadas de um design system](imagens/camadas_desing_system.png)
 
 ---
 
@@ -169,7 +169,7 @@ Lembre-se: Deixe o trabalho visual com o Designer. O importante no FrontEnd em i
 * Se muda o modelo → sidebar
 * Se muda o resultado → área principal
  
-![Wireframe do layout Streamlit](images/hierarquia_visual.png)
+![Wireframe do layout Streamlit](imagens/hierarquia_visual_navegacao.png)
 
 ---
 
@@ -293,6 +293,7 @@ if 'last_result' not in st.session_state:
 ```
 
 ---
+
 
 
 
