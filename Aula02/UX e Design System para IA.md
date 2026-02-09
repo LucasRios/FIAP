@@ -95,7 +95,7 @@ A interface deve proteger o usuário quando o modelo está incerto, incentivando
 
 ---
 
-## 2.3 Pilar 3 — Design para Latência e Feedback (10 min)
+## 2.3 Pilar 3 — Design para Latência e Feedback
 
 **Regra de ouro:** Usuários toleram a espera se entenderem o que está acontecendo.
 
@@ -293,5 +293,6 @@ if 'last_result' not in st.session_state:
 ```
 
 ---
+
 
 
