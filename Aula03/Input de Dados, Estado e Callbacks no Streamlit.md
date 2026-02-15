@@ -1,10 +1,10 @@
 # Aula 3 — Interatividade Real
 ## Input de Dados, Estado e Callbacks no Streamlit
 
-Nesta aula, avançamos do dashboard estático para a aplicação interativa de verdade. O objetivo não é apenas adicionar sliders e botões, mas compreender como o Streamlit executa, reexecuta e preserva (ou não) informações ao longo do uso.
+Avançamos do dashboard estático para a aplicação interativa de verdade. O objetivo não é apenas adicionar sliders e botões, mas compreender como o Streamlit executa, reexecuta e preserva (ou não) informações ao longo do uso.
 
 Em sistemas de IA, interatividade não é detalhe estético:
-é o mecanismo que permite ajustar hiperparâmetros, testar hipóteses, comparar resultados e criar ciclos de aprendizado humano + máquina.
+É o mecanismo que permite ajustar hiperparâmetros, testar hipóteses, comparar resultados e criar ciclos de aprendizado humano + máquina.
 
 O ponto central desta aula é entender estado.
 
@@ -42,8 +42,7 @@ st.write(historico)
 Mesmo clicando várias vezes, a lista sempre volta vazia.
 Isso acontece porque, a cada interação, o script começa do zero e historico é recriado.
 
-Em aplicações de IA, isso é inaceitável.
-Precisamos manter:
+Em aplicações de IA, precisamos conseguir manter:
 
 - histórico de execuções
 - resultados anteriores
@@ -91,7 +90,7 @@ Não existe separação rígida entre front-end e back-end.
 
 ## 3. O Ciclo de Vida da Aplicação Streamlit
 
-Para dominar interatividade, o aluno precisa internalizar este modelo mental:
+Para dominar interatividade, precisamos então internalizar este modelo mental:
 
 1. O script sempre começa do topo
 2. Widgets capturam valores do usuário
@@ -264,8 +263,6 @@ Esse padrão é a base de simuladores, trainers e dashboards de IA profissionais
 
 ## 9. Modelo mental final (takeaway da aula)
 
-Ao final desta aula, o aluno deve sair com o seguinte entendimento:
-
 - Streamlit sempre reexecuta o script
 - Variáveis normais não persistem
 - st.session_state é a memória da aplicação
@@ -273,3 +270,4 @@ Ao final desta aula, o aluno deve sair com o seguinte entendimento:
 - Botões disparam ações
 - Callbacks reagem a mudanças
 - A UI é reflexo direto do estado
+
