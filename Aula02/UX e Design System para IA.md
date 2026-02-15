@@ -234,8 +234,6 @@ Tudo o que vimos na parte teórica. Sempre que for fazer uma interface, copie es
 * Sidebar como painel de controle (Onde ficam configurações que alteram o comportamento do sistema)
 * Feedback humano (Como o usuário pode confirmar, corrigir ou discordar da decisão da IA)
 
-![Fluxo completo do app](images/fluxo_completo.png)
-
 ---
 
 ## 5.3 Refatoração Guiada
@@ -293,6 +291,7 @@ if 'last_result' not in st.session_state:
 ```
 
 ---
+
 
 
 
