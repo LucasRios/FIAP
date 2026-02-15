@@ -300,6 +300,389 @@ st.progress(int(score * 100))
 * Usar Streamlit de forma mais profissional
 
 ---
+Rodando no Visual Code
+
+```python
+import streamlit as st
+import random
+import time
+import numpy as np
+
+# -------------------------------
+# CONFIGURAÇÃO DA PÁGINA
+# -------------------------------
+st.set_page_config(page_title="AI UX Demo", layout="wide")
+
+# -------------------------------
+# SESSION STATE
+# -------------------------------
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
+
+if "feedback_log" not in st.session_state:
+    st.session_state.feedback_log = []
+
+# -------------------------------
+# SIDEBAR — CONTROLE DO SISTEMA
+# -------------------------------
+st.sidebar.header("Configurações do Modelo")
+
+model_type = st.sidebar.selectbox(
+    "Modelo",
+    ["Base", "Avançado"]
+)
+
+threshold = st.sidebar.slider(
+    "Threshold de decisão",
+    0.0, 1.0, 0.75
+)
+
+simulate_latency = st.sidebar.checkbox("Simular latência", True)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Sobre")
+st.sidebar.info(
+    "Este app simula comportamento probabilístico, "
+    "explicabilidade e human-in-the-loop."
+)
+
+# -------------------------------
+# EMPTY STATE
+# -------------------------------
+st.title("Classificador de Imagem (Simulado)")
+
+uploaded = st.file_uploader("Envie uma imagem", type=["png", "jpg", "jpeg"])
+
+if not uploaded:
+    st.info("Envie uma imagem para iniciar a análise.")
+    st.stop()
+
+# -------------------------------
+# PROCESSAMENTO
+# -------------------------------
+if simulate_latency:
+    with st.spinner("Extraindo características..."):
+        time.sleep(1)
+
+    with st.spinner("Classificando padrões..."):
+        time.sleep(1)
+
+# -------------------------------
+# SIMULAÇÃO DE MODELO
+# -------------------------------
+def simulate_model(model_type):
+    base_score = random.uniform(0.4, 0.95)
+
+    if model_type == "Avançado":
+        base_score += 0.05
+
+    score = min(base_score, 0.99)
+    label = "Cachorro" if score >= threshold else "Gato"
+
+    explanation = {
+        "Formato das orelhas": np.round(random.uniform(0.1, 0.4), 2),
+        "Textura do pelo": np.round(random.uniform(0.1, 0.4), 2),
+        "Formato do focinho": np.round(random.uniform(0.1, 0.4), 2),
+    }
+
+    return label, score, explanation
+
+label, score, explanation = simulate_model(model_type)
+
+st.session_state.last_result = {
+    "label": label,
+    "score": score,
+    "explanation": explanation
+}
+
+# -------------------------------
+# RESULTADO
+# -------------------------------
+st.subheader("Resultado Estimado")
+st.write(f"Classe prevista: **{label}**")
+
+confidence_percent = int(score * 100)
+
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    st.metric("Confiança", f"{confidence_percent}%")
+    st.progress(confidence_percent)
+
+with col2:
+    if score >= 0.85:
+        st.success("Alta confiança na previsão.")
+    elif score >= 0.60:
+        st.warning("Confiança moderada. Revisão recomendada.")
+    else:
+        st.error("Baixa confiança. Revisão humana necessária.")
+
+# -------------------------------
+# EXPLAINABILITY (LOCAL)
+# -------------------------------
+st.markdown("---")
+st.subheader("Por que o modelo decidiu isso?")
+
+for feature, weight in explanation.items():
+    st.write(f"{feature}")
+    st.progress(int(weight * 100))
+
+st.info(
+    "As barras representam a influência relativa de cada característica "
+    "na decisão atual (explicação local simulada)."
+)
+
+# -------------------------------
+# HUMAN-IN-THE-LOOP
+# -------------------------------
+st.markdown("---")
+st.subheader("Validação Humana")
+
+feedback_col1, feedback_col2 = st.columns(2)
+
+with feedback_col1:
+    if st.button("👍 A IA acertou"):
+        st.session_state.feedback_log.append({
+            "result": label,
+            "score": score,
+            "correct": True
+        })
+        st.success("Feedback registrado.")
+
+with feedback_col2:
+    if st.button("👎 A IA errou"):
+        st.session_state.feedback_log.append({
+            "result": label,
+            "score": score,
+            "correct": False
+        })
+        st.error("Feedback registrado.")
+
+# -------------------------------
+# MONITORAMENTO SIMPLES
+# -------------------------------
+st.markdown("---")
+st.subheader("Monitoramento do Sistema")
+
+total = len(st.session_state.feedback_log)
+
+if total > 0:
+    correct = sum(1 for f in st.session_state.feedback_log if f["correct"])
+    accuracy = correct / total
+
+    st.metric("Feedbacks recebidos", total)
+    st.metric("Acurácia percebida", f"{int(accuracy*100)}%")
+
+    if accuracy < 0.7:
+        st.warning("Possível degradação do modelo detectada.")
+else:
+    st.info("Ainda não há feedback suficiente para monitoramento.")
+
+# -------------------------------
+# HISTÓRICO
+# -------------------------------
+st.markdown("---")
+st.subheader("Histórico de Decisões")
+
+st.session_state.history.append({
+    "label": label,
+    "score": score
+})
+
+for item in st.session_state.history[-5:]:
+    st.write(f"{item['label']} — {int(item['score']*100)}%")
+```
+Rodando no Collab
+```python
+!pip install -q streamlit
+!wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+!dpkg -i cloudflared-linux-amd64.deb
+```
+```python
+%%writefile app.py
+import streamlit as st
+import random
+import time
+import numpy as np
+
+st.set_page_config(page_title="AI UX Demo", layout="wide")
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
+
+if "feedback_log" not in st.session_state:
+    st.session_state.feedback_log = []
+
+st.sidebar.header("Configurações do Modelo")
+
+model_type = st.sidebar.selectbox(
+    "Modelo",
+    ["Base", "Avançado"]
+)
+
+threshold = st.sidebar.slider(
+    "Threshold de decisão",
+    0.0, 1.0, 0.75
+)
+
+simulate_latency = st.sidebar.checkbox("Simular latência", True)
+
+st.sidebar.markdown("---")
+st.sidebar.info(
+    "Simulação de modelo com explicabilidade e human-in-the-loop."
+)
+
+st.title("Classificador de Imagem (Simulado)")
+
+uploaded = st.file_uploader("Envie uma imagem", type=["png", "jpg", "jpeg"])
+
+if not uploaded:
+    st.info("Envie uma imagem para iniciar a análise.")
+    st.stop()
+
+if simulate_latency:
+    with st.spinner("Extraindo características..."):
+        time.sleep(1)
+    with st.spinner("Classificando padrões..."):
+        time.sleep(1)
+
+def simulate_model(model_type):
+    base_score = random.uniform(0.4, 0.95)
+
+    if model_type == "Avançado":
+        base_score += 0.05
+
+    score = min(base_score, 0.99)
+    label = "Cachorro" if score >= threshold else "Gato"
+
+    explanation = {
+        "Formato das orelhas": np.round(random.uniform(0.1, 0.4), 2),
+        "Textura do pelo": np.round(random.uniform(0.1, 0.4), 2),
+        "Formato do focinho": np.round(random.uniform(0.1, 0.4), 2),
+    }
+
+    return label, score, explanation
+
+label, score, explanation = simulate_model(model_type)
+
+st.session_state.last_result = {
+    "label": label,
+    "score": score,
+    "explanation": explanation
+}
+
+st.subheader("Resultado Estimado")
+st.write(f"Classe prevista: **{label}**")
+
+confidence_percent = int(score * 100)
+
+col1, col2 = st.columns([1, 2])
+
+with col1:
+    st.metric("Confiança", f"{confidence_percent}%")
+    st.progress(confidence_percent)
+
+with col2:
+    if score >= 0.85:
+        st.success("Alta confiança na previsão.")
+    elif score >= 0.60:
+        st.warning("Confiança moderada. Revisão recomendada.")
+    else:
+        st.error("Baixa confiança. Revisão humana necessária.")
+
+st.markdown("---")
+st.subheader("Por que o modelo decidiu isso?")
+
+for feature, weight in explanation.items():
+    st.write(feature)
+    st.progress(int(weight * 100))
+
+st.markdown("---")
+st.subheader("Validação Humana")
+
+feedback_col1, feedback_col2 = st.columns(2)
+
+with feedback_col1:
+    if st.button("IA acertou"):
+        st.session_state.feedback_log.append({
+            "result": label,
+            "score": score,
+            "correct": True
+        })
+        st.success("Feedback registrado.")
+
+with feedback_col2:
+    if st.button("IA errou"):
+        st.session_state.feedback_log.append({
+            "result": label,
+            "score": score,
+            "correct": False
+        })
+        st.error("Feedback registrado.")
+
+st.markdown("---")
+st.subheader("Monitoramento do Sistema")
+
+total = len(st.session_state.feedback_log)
+
+if total > 0:
+    correct = sum(1 for f in st.session_state.feedback_log if f["correct"])
+    accuracy = correct / total
+
+    st.metric("Feedbacks recebidos", total)
+    st.metric("Acurácia percebida", f"{int(accuracy*100)}%")
+
+    if accuracy < 0.7:
+        st.warning("Possível degradação do modelo detectada.")
+else:
+    st.info("Ainda não há feedback suficiente.")
+
+st.markdown("---")
+st.subheader("Histórico de Decisões")
+
+st.session_state.history.append({
+    "label": label,
+    "score": score
+})
+
+for item in st.session_state.history[-5:]:
+    st.write(f"{item['label']} — {int(item['score']*100)}%")
+```
+
+```python
+import subprocess
+import threading
+import time
+
+def run_streamlit():
+    subprocess.Popen(["streamlit", "run", "app.py", "--server.port", "8501"])
+
+def run_tunnel():
+    p = subprocess.Popen(
+        ["cloudflared", "tunnel", "--url", "http://localhost:8501"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True
+    )
+    
+    for line in p.stdout:
+        if "trycloudflare.com" in line:
+            print("\n--- SEU APP ESTÁ RODANDO AQUI ---")
+            print(line.strip())
+            print("---------------------------------\n")
+            break
+
+threading.Thread(target=run_streamlit).start()
+time.sleep(5)
+run_tunnel()
+```
+
 
 # Apêndice — Trechos adicionais de código
 
@@ -330,6 +713,7 @@ if 'last_result' not in st.session_state:
 - Christoph Molnar — Interpretable Machine Learning
 - Stuart Russell — Human Compatible
 - Chip Huyen — Designing Machine Learning Systems
+
 
 
 
