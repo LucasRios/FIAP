@@ -1,57 +1,232 @@
-#exemplo de um script estático para simular a avaliação de um modelo de IA, onde temos uma função que retorna métricas de avaliação como precisão e perda. O script inclui um atraso para simular o tempo de inferência e imprime os resultados no console.
+import streamlit as st
 import random
 import time
+import numpy as np
 
-def avaliar():
-    time.sleep(1)  # simula inferência
-    return {"accuracy": random.uniform(0.6, 0.98),
-            "loss": random.uniform(0.1, 0.6)}
+# -------------------------------
+# CONFIGURAÇÕES AUXILIARES PARA RODAR
+# ------------------------------- 
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-if __name__ == "__main__":
-    print("Avaliando modelo...")
-    m = avaliar()
-    print("accuracy:", m["accuracy"])
-    print("loss:", m["loss"])
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
 
+if "feedback_log" not in st.session_state:
+    st.session_state.feedback_log = []
  
-#importa o streamLit para podermos seguir com a programação normal  
-import streamlit as st
+def simulate_model(model_type):
+    base_score = random.uniform(0.4, 0.95)
 
-# Configuração da página (Isso define o comportamento no browser)
-st.set_page_config(page_title="Minha IA", layout="wide",initial_sidebar_state="expanded", page_icon="🤖",menu_items={
-          'Get Help': 'https://www.extremelycoolapp.com/help',
-          'Report a bug': "https://www.extremelycoolapp.com/bug",
-         'About': "# This is a header. This is an *extremely* cool app!"
-     })
+    if model_type == "Avançado":
+        base_score += 0.05
 
-st.title("Construindo Interfaces com IA")
+    score = min(base_score, 0.99)
+    label = "Cachorro" if score >= threshold else "Gato"
 
-#1 - Comece pensando nas abas paa organizar as informações em seus contextos
-tab_home, tab_metricas = st.tabs(["Início", "Métricas"])
+    explanation = {
+        "Formato das orelhas": np.round(random.uniform(0.1, 0.4), 2),
+        "Textura do pelo": np.round(random.uniform(0.1, 0.4), 2),
+        "Formato do focinho": np.round(random.uniform(0.1, 0.4), 2),
+    }
 
-#com a primeira tab comece a pensar sobre o input e output
-with tab_home:
-    #2 - Dentro da primeira tab, pense em colunas. É interessante separar em colunas o que preciso pedir? ou melhor manter em uma lista inteira?
-    col_input, col_preview = st.columns([1, 1]) # Proporção das colunas
-    
-    with col_input:
-      #3 - a partir da coluna, pense nas linhas, nas informações que você precisa pedir ou apresentar
-        st.subheader("Entrada")
-        upload = st.file_uploader("Suba uma imagem para análise", type=["jpg", "png"])
-        prompt = st.text_area("O que a IA deve procurar?")
-        botao = st.button("Analisar Agora")
+    return label, score, explanation
 
-    with col_preview:
-        st.subheader("Saída da IA")
-        if botao:
-            st.success("Processamento concluído!")
-            # Simulação de saída
-            st.image("https://via.placeholder.com/400", caption="Resultado da Detecção")
 
-with tab_metricas:
-    #Métricas de Contexto
-    st.subheader("Métricas do Modelo")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Precisão", "92%", "+1.5%")
-    m2.metric("Tempo de Resposta", "0.8s", "-0.2s")
-    m3.metric("Uso de Memória", "450MB")
+
+
+
+
+
+# -------------------------------
+# CONFIGURAÇÃO DA PÁGINA
+# -------------------------------
+st.set_page_config(page_title="AI UX Demo", layout="wide")
+ 
+# -------------------------------
+# SIDEBAR — CONTROLE DO SISTEMA
+# -------------------------------
+st.sidebar.header("Configurações do Modelo")
+
+model_type = st.sidebar.selectbox(
+    "Modelo",
+    ["Base", "Avançado"]
+)
+
+threshold = st.sidebar.slider(
+    "Threshold de decisão",
+    0.0, 1.0, 0.75
+)
+
+simulate_latency = st.sidebar.checkbox("Simular latência", True)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### Sobre")
+st.sidebar.info(
+    "Este app simula comportamento probabilístico, "
+    "explicabilidade e human-in-the-loop."
+)
+
+# -------------------------------
+# 1 - Empty state
+# -------------------------------
+st.title("Classificador de Imagem (Simulado) - 1 - Empty state")
+
+uploaded = st.file_uploader("Envie uma imagem", type=["png", "jpg", "jpeg"])
+
+if not uploaded:
+    st.info("Envie uma imagem para iniciar a análise.")
+    st.stop()
+
+# -------------------------------
+# 2 - Loading State | Design para Latência - PROCESSAMENTO
+# -------------------------------
+if simulate_latency:
+    with st.spinner("Extraindo características... 2 - Loading State"):
+        time.sleep(1)
+    with st.spinner("Classificando padrões... 2 - Loading State"):
+        time.sleep(1)
+    with st.spinner("Obtendo resultados... 3 - Design para Latência"):
+        progress_bar = st.progress(0)
+        status_text = st.empty() 
+        total_steps = 100 
+        for i in range(total_steps):
+            time.sleep(0.03)  # latência maior aqui
+            progress_bar.progress(i + 1)
+
+        st.success("Resultados consolidados.")      
+
+
+label, score, explanation = simulate_model(model_type)
+
+st.session_state.last_result = {
+    "label": label,
+    "score": score,
+    "explanation": explanation
+}
+
+confidence_percent = int(score * 100)
+
+# ==========================================================
+# TABS DE RESULTADOS
+# ==========================================================
+tab_predicao, tab_monitoramento = st.tabs(
+    ["Predição & Validação Humana", "Monitoramento & Histórico"]
+)
+ 
+with tab_predicao:
+
+    # -------------------------------
+    # 3 - Confidence UI 
+    # -------------------------------
+    st.subheader("Resultado da Classificação - 3 - Confidence UI ")
+
+    row1_col1, row1_col2 = st.columns([1, 2])
+
+    with row1_col1:
+        st.metric("Classe Prevista", label)
+        st.metric("Confiança", f"{confidence_percent}%")
+        st.progress(confidence_percent)
+
+    with row1_col2:
+        if score >= 0.85:
+            st.success("Alta confiança na previsão.")
+        elif score >= 0.60:
+            st.warning("Confiança moderada. Revisão recomendada.")
+        else:
+            st.error("Baixa confiança. Revisão humana necessária.")
+
+    st.markdown("---")
+
+    # -------------------------------
+    # 4 - EXPLICABILIDADE  
+    # -------------------------------
+    st.subheader("Explicabilidade Local - 4 - EXPLICABILIDADE")
+
+    exp_col1, exp_col2 = st.columns(2)
+
+    features = list(explanation.items())
+
+    with exp_col1:
+        for feature, weight in features[:2]:
+            st.write(feature)
+            st.progress(int(weight * 100))
+
+    with exp_col2:
+        for feature, weight in features[2:]:
+            st.write(feature)
+            st.progress(int(weight * 100))
+
+    st.markdown("---")
+
+    # -------------------------------
+    # 5 - HUMAN IN THE LOOP  
+    # -------------------------------
+    st.subheader("Validação Humana - 5 - HUMAN IN THE LOOP")
+
+    feedback_col1, feedback_col2 = st.columns(2)
+
+    with feedback_col1:
+        if st.button("IA acertou"):
+            st.session_state.feedback_log.append({
+                "result": label,
+                "score": score,
+                "correct": True
+            })
+            st.success("Feedback registrado.")
+
+    with feedback_col2:
+        if st.button("IA errou"):
+            st.session_state.feedback_log.append({
+                "result": label,
+                "score": score,
+                "correct": False
+            })
+            st.error("Feedback registrado.")
+
+
+# ==========================================================
+# TAB 2 — MONITORAMENTO & HISTÓRICO
+# ==========================================================
+with tab_monitoramento:
+
+    st.subheader("Monitoramento do Sistema")
+
+    total = len(st.session_state.feedback_log)
+
+    if total > 0:
+        correct = sum(1 for f in st.session_state.feedback_log if f["correct"])
+        accuracy = correct / total
+
+        monitor_col1, monitor_col2 = st.columns(2)
+
+        with monitor_col1:
+            st.metric("Feedbacks recebidos", total)
+
+        with monitor_col2:
+            st.metric("Acurácia percebida", f"{int(accuracy*100)}%")
+
+        if accuracy < 0.7:
+            st.warning("Possível degradação do modelo detectada.")
+    else:
+        st.info("Ainda não há feedback suficiente para monitoramento.")
+
+    st.markdown("---")
+
+    # -------------------------------
+    # HISTÓRICO
+    # -------------------------------
+    st.subheader("Histórico de Decisões")
+
+    st.session_state.history.append({
+        "label": label,
+        "score": score
+    })
+
+    history_cols = st.columns(2)
+
+    recent = st.session_state.history[-6:]
+
+    for i, item in enumerate(recent):
+        with history_cols[i % 2]:
+            st.write(f"{item['label']} — {int(item['score']*100)}%")
