@@ -957,3 +957,7 @@ threading.Thread(target=run_streamlit).start()
 time.sleep(5)
 run_tunnel()
 ```
+---
+
+## Referências
+https://docs.streamlit.io/
