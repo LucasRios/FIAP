@@ -291,6 +291,11 @@ if 'last_result' not in st.session_state:
 ```
 
 ---
+# Referências
+- Ben Shneiderman — Designing Human-Centered AI
+- Christoph Molnar — Interpretable Machine Learning
+- Stuart Russell — Human Compatible
+- Chip Huyen — Designing Machine Learning Systems
 
 
 
