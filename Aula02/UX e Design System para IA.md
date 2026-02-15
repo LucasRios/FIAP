@@ -182,7 +182,7 @@ Usar cor como significado, não como decoração:
 * `st.error` → falha ou risco
 * `st.info` → explicação
  
-![Paleta semântica de cores](images/cores_semanticas.png)
+![Paleta semântica de cores](imagens/cores_semanticas.png)
 
 ---
 
@@ -205,7 +205,7 @@ model = st.sidebar.selectbox("Modelo", ["Base", "Avançado"])
 threshold = st.sidebar.slider("Threshold", 0.0, 1.0, 0.75)
 ```
 
-![Feedback visual no Streamlit](images/componentes_feedback.png)
+![Feedback visual no Streamlit](imagens/componentes_feedback.png)
 
 ---
 
@@ -291,6 +291,7 @@ if 'last_result' not in st.session_state:
 ```
 
 ---
+
 
 
 
