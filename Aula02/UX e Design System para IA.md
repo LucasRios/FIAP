@@ -807,35 +807,13 @@ run_tunnel()
 ```
 
 
-# Apêndice — Trechos adicionais de código
-
-## Empty State
-
-```python
-if not input:
-    st.info("Envie uma imagem para iniciar")
-```
-
-## Feedback do usuário
-
-```python
-if st.button("👍"):
-    log_feedback(True)
-```
-
-## Session State
-
-```python
-if 'last_result' not in st.session_state:
-    st.session_state['last_result'] = None
-```
-
 ---
 # Referências
 - Ben Shneiderman — Designing Human-Centered AI
 - Christoph Molnar — Interpretable Machine Learning
 - Stuart Russell — Human Compatible
 - Chip Huyen — Designing Machine Learning Systems
+
 
 
 
