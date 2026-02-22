@@ -1,4 +1,4 @@
-# 1 Modelo de Execução do Streamlit (15 min)
+# 1 Modelo de Execução do Streamlit
 
 ## Conceito fundamental
 
@@ -15,40 +15,114 @@ Arquitetura mental:
 
 Estado atual → Script roda inteiro → UI é reconstruída
 
-Não existe manipulação incremental de DOM.
-
-Isso traz:
-
-✔ Simplicidade  
-✔ Previsibilidade  
-❌ Risco de ineficiência se mal estruturado  
-
 ---
 
-## Fluxo Interno Simplificado
-
-1. Usuário interage.
-2. Frontend envia evento.
-3. Backend reexecuta o script.
-4. Novo estado é reconciliado.
-5. UI é atualizada.
-
-Portanto:
-
-> Performance em Streamlit é controle inteligente do que roda no rerun.
-
----
-
-# 2️⃣ Caching Profundo
+# 2 Caching Profundo
 
 Caching é o pilar de performance no Streamlit moderno.
 
-Desde as versões recentes, o sistema foi redesenhado.
+## O que é cache, de fato?
 
-Temos dois tipos principais:
+Cache é o mecanismo de **armazenar o resultado de uma execução custosa** para reutilizá-lo posteriormente sem recalcular.
 
-- `st.cache_data`
-- `st.cache_resource`
+Em termos simples:
+
+> Se a entrada não mudou, o resultado também não precisa mudar.
+
+No contexto do Streamlit isso é ainda mais importante, porque, sem cache, qualquer ajuste em um slider poderia:
+
+- Recarregar um CSV grande.
+- Reexecutar uma query SQL.
+- Reprocessar um modelo de IA.
+- Fazer múltiplas chamadas a API.
+
+Isso gera:
+- Lentidão perceptível.
+- Consumo desnecessário de CPU.
+- Custos maiores (em APIs pagas).
+- Experiência ruim para o usuário.
+
+---
+
+## O efeito do cache no ciclo de execução
+
+Lembre do fluxo padrão do Streamlit:
+
+Quando aplicamos cache, o fluxo muda sutilmente:
+
+1. Usuário interage.
+2. Script roda novamente.
+3. Função cacheada é chamada.
+4. Streamlit verifica:
+   - A função mudou?
+   - Os parâmetros mudaram?
+5. Se nada mudou → retorna resultado armazenado.
+6. Se algo mudou → recalcula e atualiza o cache.
+
+Ou seja:
+
+> O rerun continua acontecendo.  
+> O que muda é que partes do código deixam de ser reexecutadas de fato.
+
+O cache não impede o rerun.  
+Ele reduz o custo do rerun.
+
+---
+
+## Como o Streamlit decide reutilizar o cache?
+
+Internamente, o Streamlit:
+
+- Gera um hash da função.
+- Gera um hash dos argumentos passados.
+- Combina essas informações.
+- Usa isso como chave de armazenamento.
+
+Se qualquer elemento for diferente:
+
+- Código da função
+- Valor dos parâmetros
+- Dependências explícitas
+
+O cache é invalidado automaticamente.
+
+Isso torna o sistema:
+
+✔ Determinístico  
+✔ Seguro  
+✔ Reprodutível  
+
+---
+
+## O impacto direto na performance
+
+Sem cache:
+
+- Tempo de resposta cresce linearmente com a complexidade.
+- Pequenas interações podem levar segundos.
+- Modelos grandes tornam o app quase inutilizável.
+
+Com cache:
+
+- Processamentos pesados acontecem uma única vez.
+- Interações subsequentes tornam-se quase instantâneas.
+- O app passa a parecer reativo.
+
+Em aplicações de IA, isso é ainda mais crítico:
+
+- Carregar um modelo pode levar segundos.
+- Rodar embeddings pode ser caro.
+- Consultar APIs pode ter latência externa.
+
+---
+
+## Regra mental para uso consciente
+
+Sempre que escrever uma função, pergunte:
+
+- Isso é custoso?
+- O resultado depende apenas desses parâmetros?
+- Ele precisa ser recalculado a cada interação?
 
 ---
 
@@ -67,6 +141,7 @@ Exemplo:
 @st.cache_data
 def carregar_dados():
     return pd.read_csv("dados.csv")
+```
 
 Como funciona internamente?
 	•	Streamlit cria hash da função + parâmetros.
@@ -91,9 +166,11 @@ Usado para:
 
 Exemplo:
 
+```python
 @st.cache_resource
 def carregar_modelo():
     return ModeloGigante()
+```
 
 Diferença conceitual:
 
@@ -102,23 +179,115 @@ Guarda resultado	Guarda instância
 Serializa	Mantém objeto vivo
 Ideal para dados	Ideal para recursos
 
-
 ⸻
 
-2.3 TTL (Time to Live)
+## 2.3 TTL (Time to Live)
 
-Controle de expiração:
+TTL significa **Time to Live** — tempo de vida do cache.
 
+Ele define **por quanto tempo o resultado armazenado pode ser reutilizado antes de ser considerado inválido**.
+
+Exemplo:
+
+```python
 @st.cache_data(ttl=3600)
 def carregar_api():
     return requests.get(url).json()
+```
 
-Após 1 hora → invalida cache.
+Aqui estamos dizendo:
+	•	O resultado dessa função pode ser reutilizado por 3600 segundos (1 hora).
+	•	Após esse período, na próxima chamada, o Streamlit ignora o valor armazenado.
+	•	A função é executada novamente.
+	•	O novo resultado substitui o antigo no cache.
 
-Essencial para:
-	•	Dados externos
-	•	APIs dinâmicas
+⸻
+
+O que acontece na prática?
+
+Sem TTL:
+	•	Se os parâmetros não mudarem, o cache pode durar indefinidamente.
+	•	Mesmo que os dados externos tenham sido atualizados.
+
+Com TTL:
+	1.	A função é chamada.
+	2.	O resultado é salvo junto com um timestamp.
+	3.	Durante o período definido, o valor é reutilizado.
+	4.	Quando o tempo expira:
+	•	O próximo acesso dispara novo cálculo.
+	•	O cache é atualizado automaticamente.
+
+Importante:
+O TTL não executa a função automaticamente ao expirar.
+Ele apenas força o recálculo na próxima vez que a função for chamada.
+
+⸻
+
+Por que isso é essencial?
+
+Streamlit é muito usado para:
 	•	Dashboards de monitoramento
+	•	Métricas operacionais
+	•	Dados financeiros
+	•	Integração com APIs externas
+
+Esses dados mudam com o tempo.
+
+Se você usar cache sem TTL:
+	•	O app pode mostrar informações desatualizadas.
+	•	O usuário pode tomar decisões com base em dados antigos.
+
+TTL equilibra:
+
+✔ Performance
+✔ Atualização automática
+✔ Redução de chamadas externas
+
+⸻
+
+Como escolher o valor de TTL?
+
+Depende do tipo de dado:
+
+Tipo de dado	TTL sugerido
+Dados quase estáticos	Horas ou dias
+Dados operacionais	Minutos
+Monitoramento em tempo real	Segundos
+APIs caras	TTL maior para reduzir custo
+
+⸻
+
+Relação entre TTL e custo
+
+Em APIs pagas (OpenAI, serviços financeiros, etc.):
+	•	Cada chamada tem custo.
+	•	Sem TTL → cada interação pode gerar nova chamada.
+	•	Com TTL → múltiplos usuários reutilizam o mesmo resultado durante o período.
+
+Isso reduz drasticamente:
+	•	Latência
+	•	Consumo de recursos
+	•	Custo financeiro
+
+⸻
+
+Mentalidade correta sobre TTL
+
+Pergunta estratégica:
+
+Com que frequência esse dado realmente precisa ser atualizado?
+
+Se a resposta for:
+	•	“A cada clique” → talvez não devesse ser cacheado.
+	•	“A cada alguns minutos” → TTL é ideal.
+	•	“Raramente muda” → TTL longo ou sem TTL.
+
+⸻
+
+TTL é o mecanismo que transforma cache em algo inteligente.
+
+Sem TTL → performance máxima, risco de desatualização.
+Com TTL → equilíbrio entre velocidade e confiabilidade.
 
 ⸻
 
@@ -133,70 +302,183 @@ st.cache_data.clear()
 
 ⸻
 
-2.5 Problemas comuns
+## 2.5 Problemas comuns
 
-1. Mutação de objetos
+# 1. Mutação de objetos
 
-Nunca altere objeto cacheado diretamente.
+Quando você usa cache, o Streamlit armazena o **resultado da função** e reutiliza exatamente aquele objeto nas próximas execuções.
 
-Errado:
+Se você modificar esse objeto diretamente, estará alterando também a versão armazenada no cache.
+
+Isso pode gerar:
+
+- Efeitos colaterais difíceis de rastrear
+- Dados “duplicados”
+- Colunas sendo criadas múltiplas vezes
+- Comportamento inconsistente entre usuários
+
+---
+
+### Errado
+
+```python
+@st.cache_data
+def carregar_dados():
+    return pd.read_csv("dados.csv")
 
 df = carregar_dados()
-df["nova_coluna"] = ...
 
-Certo:
+# Aqui você está alterando o próprio objeto cacheado
+df["nova_coluna"] = df["valor"] * 2
+```
+
+O que acontece:
+	•	carregar_dados() retorna o mesmo objeto salvo no cache.
+	•	Ao adicionar nova_coluna, você modifica o objeto original.
+	•	No próximo rerun, essa coluna já existirá.
+	•	Se repetir a operação, pode gerar erro ou duplicação.
+
+⸻
+
+Correto
 
 df = carregar_dados().copy()
 
+# Agora você trabalha em uma cópia independente
+df["nova_coluna"] = df["valor"] * 2
+
+O .copy() cria uma nova instância em memória.
+
+O cache permanece intacto.
+Você trabalha de forma isolada.
+
+⸻
+
+Regra mental
+
+Nunca modifique diretamente algo que veio de uma função cacheada.
+
+Sempre trate como imutável.
 
 ⸻
 
 2. Dependências invisíveis
 
-Se função depende de variável externa não declarada como parâmetro, o cache pode se comportar errado.
+O problema
 
-Sempre passe tudo como argumento.
+O cache do Streamlit é baseado em:
+	•	Código da função
+	•	Parâmetros declarados
+
+Se sua função depender de algo externo que não está nos parâmetros, o cache pode não perceber mudanças.
+
+Isso gera comportamento incorreto.
+
+⸻
+
+Errado
+
+```python
+fator = 10
+
+@st.cache_data
+def transformar(df):
+    # Usa variável externa sem declarar como parâmetro
+    return df["valor"] * fator
+```
+
+Se você mudar:
+
+fator = 20
+
+O cache pode continuar retornando o valor antigo, porque:
+	•	O parâmetro fator não faz parte da assinatura da função.
+	•	O hash da função não detecta essa mudança corretamente.
+
+⸻
+
+Correto
+
+```python
+@st.cache_data
+def transformar(df, fator):
+    return df["valor"] * fator
+
+resultado = transformar(df, fator)
+```
+Agora:
+	•	O valor de fator faz parte da chave de cache.
+	•	Se ele mudar → o cache é invalidado automaticamente.
+	•	Comportamento previsível.
+
+⸻
+
+Regra mental
+
+Tudo que influencia o resultado deve ser parâmetro da função.
 
 ⸻
 
 3 Performance Estrutural
 
-Caching resolve 70% dos problemas.
-
-Os outros 30% vêm de arquitetura.
-
 ⸻
 
 3.1 Separação de responsabilidades
 
-Evite:
+Misturar tudo em sequência cria acoplamento forte.
 
+Evite
+
+```python
 modelo = carregar_modelo()
 dados = carregar_dados()
 resultado = modelo.processar(dados)
-st.line_chart(resultado)
 
-Prefira:
-	•	Camada de dados
-	•	Camada de processamento
-	•	Camada de visualização
+st.line_chart(resultado)
+```
+
+Problemas:
+	•	Não está claro o que é dado, recurso ou visualização.
+	•	Difícil testar partes isoladamente.
+	•	Se algo mudar, tudo pode ser reexecutado.
+
+⸻
+
+Prefira estrutura em camadas
+```python
+Camada de Dados
+
+@st.cache_data
+def carregar_dados():
+    return pd.read_csv("dados.csv")
+
+Camada de Processamento
+
+@st.cache_data
+def processar(dados):
+    modelo = carregar_modelo()
+    return modelo.processar(dados)
+
+Camada de Visualização
+
+dados = carregar_dados()
+resultado = processar(dados)
+
+st.line_chart(resultado)
+```
+
+Agora:
+	•	Cada parte tem responsabilidade clara.
+	•	Cada camada pode ser cacheada de forma independente.
+	•	O código escala melhor.
 
 ⸻
 
 3.2 Evite recomputação dentro de widgets
 
-Errado:
+Widgets disparam rerun.
 
-coluna = st.selectbox("Coluna", df.columns)
-df_processado = modelo.processar(df)
-st.line_chart(df_processado[coluna])
-
-Correto:
-
-df_processado = processar(df)  # cacheado
-coluna = st.selectbox("Coluna", df_processado.columns)
-st.line_chart(df_processado[coluna])
-
+Se você colocar processamento pesado logo após um widget, ele será reexecutado a cada interação.
 
 ⸻
 
