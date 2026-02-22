@@ -439,6 +439,8 @@ Ideal para séries temporais.
 st.line_chart(df, x="data", y="valor")
 ```
 
+![chart_line.png](imagens/chart_line.png)
+
 Use para: 
 - Evolução de métricas 
 - Perda de modelo ao longo das épocas 
@@ -454,6 +456,8 @@ Similar ao line chart, mas com preenchimento.
 st.area_chart(df, x="data", y="valor")
 ```
 
+![chart_area.png](imagens/chart_area.png)
+
 Útil quando: 
 - Deseja transmitir volume acumulado 
 - Mostrar participação proporcional
@@ -467,6 +471,8 @@ Comparação entre categorias.
 ``` python
 st.bar_chart(df, x="categoria", y="quantidade")
 ```
+
+![chart_bar.png](imagens/chart_bar.png)
 
 Boa prática: 
 - Ordenar antes de plotar 
@@ -482,6 +488,8 @@ Muito importante para IA.
 st.scatter_chart(df, x="feature1", y="feature2")
 ```
 
+![chart_scatter.png](imagens/chart_scatter.png)
+
 Aplicações: 
 - Correlação entre variáveis 
 - Separação de classes 
@@ -496,6 +504,8 @@ Se o DataFrame possuir colunas `lat` e `lon`, o Streamlit renderiza automaticame
 ``` python
 st.map(df_geo)
 ```
+
+![chart_map.png](imagens/chart_map.png)
 
 Ideal para: 
 - Logística 
@@ -536,6 +546,8 @@ fig = px.scatter(
 # use_container_width=True faz o gráfico ocupar toda a largura disponível
 st.plotly_chart(fig, use_container_width=True)
 ```
+![ploty.png](imagens/ploty.png)
+
 
 ### O que esse código está fazendo?
 
@@ -587,6 +599,7 @@ chart = alt.Chart(df).mark_circle().encode(
 # Renderiza no Streamlit
 st.altair_chart(chart, use_container_width=True)
 ```
+![altair.png](imagens/altair.png)
 
 ### O que está acontecendo aqui?
 
@@ -618,6 +631,7 @@ import pydeck as pdk
 # deck deve ser um objeto previamente configurado
 st.pydeck_chart(deck)
 ```
+![pydeck.png](imagens/pydeck.png)
 
 Diferentemente de `st.map`, que é simplificado, o Pydeck permite:
 
@@ -655,6 +669,7 @@ ax.plot(df["x"], df["y"])
 # Renderiza a figura no Streamlit
 st.pyplot(fig)
 ```
+![matplotlib.png](imagens/matplotlib.png)
 
 ### Por que criar `fig, ax` explicitamente?
 
