@@ -93,9 +93,7 @@ Isso significa que:
 Ela é renderizada como um bloco fixo na interface.
 
 ``` python
-# Exibe apenas as primeiras 5 linhas do DataFrame
-# O método head() retorna as primeiras linhas do dataset
-st.table(df.head())
+st.table(df)
 ```
 
 ![table](imagens/table.png)
