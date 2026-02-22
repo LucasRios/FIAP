@@ -54,6 +54,7 @@ df = pd.read_csv("dados.csv")
 # O usuário poderá ordenar, navegar e inspecionar os dados
 st.dataframe(df)
 ```
+![Dataframe](imagens/dataframe.png)
 
 ### O que está acontecendo tecnicamente?
 
@@ -96,6 +97,8 @@ Ela é renderizada como um bloco fixo na interface.
 # O método head() retorna as primeiras linhas do dataset
 st.table(df.head())
 ```
+
+![table](imagens/table.png)
 
 ### O que está acontecendo aqui?
 
@@ -142,6 +145,7 @@ Antes de qualquer gráfico:
 # Mostra estatísticas descritivas do dataset
 st.write(df.describe())
 ```
+![describe](imagens/describe.png)
 
 Isso aumenta: 
 - Transparência 
@@ -150,7 +154,6 @@ Isso aumenta:
 
 
 ------------------------------------------------------------------------
-
 
 ## Configuração avançada de colunas (`st.column_config`)
 
@@ -166,6 +169,8 @@ Exemplo conceitual:
 
 Isso aproxima a tabela de um mini-dashboard embutido.
 
+![columConfig1](imagens/columConfig1.png)
+![columConfig2](imagens/columConfig2.png)
 ------------------------------------------------------------------------
 
 ### Exemplo 1 --- Transformando uma coluna numérica em barra de progresso
