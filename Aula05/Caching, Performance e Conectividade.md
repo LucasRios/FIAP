@@ -174,10 +174,15 @@ def carregar_modelo():
 
 Diferença conceitual:
 
-cache_data	cache_resource
-Guarda resultado	Guarda instância
-Serializa	Mantém objeto vivo
-Ideal para dados	Ideal para recursos
+cache_data	
+Guarda resultado	
+Serializa	
+Ideal para dados	
+
+cache_resource
+Guarda instância
+Mantém objeto vivo
+Ideal para recursos
 
 ⸻
 
