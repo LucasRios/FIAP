@@ -156,7 +156,7 @@ Características:
 
 ⸻
 
-2.2 st.cache_resource
+## 2.2 st.cache_resource
 
 Usado para:
 	•	Modelos de IA
@@ -291,7 +291,7 @@ Com TTL → equilíbrio entre velocidade e confiabilidade.
 
 ⸻
 
-2.4 Invalidação manual
+## 2.4 Invalidação manual
 
 st.cache_data.clear()
 
@@ -302,10 +302,8 @@ st.cache_data.clear()
 
 ⸻
 
-## 2.5 Problemas comuns
-
-# 1. Mutação de objetos
-
+## 2.5 Problemas comuns - modificar o objeto diretamente
+ 
 Quando você usa cache, o Streamlit armazena o **resultado da função** e reutiliza exatamente aquele objeto nas próximas execuções.
 
 Se você modificar esse objeto diretamente, estará alterando também a versão armazenada no cache.
@@ -340,7 +338,7 @@ O que acontece:
 
 ⸻
 
-Correto
+### Correto
 
 df = carregar_dados().copy()
 
@@ -354,7 +352,7 @@ Você trabalha de forma isolada.
 
 ⸻
 
-Regra mental
+### Regra mental
 
 Nunca modifique diretamente algo que veio de uma função cacheada.
 
@@ -362,7 +360,7 @@ Sempre trate como imutável.
 
 ⸻
 
-2. Dependências invisíveis
+## 2.5 Problemas comuns - Dependências invisíveis
 
 O problema
 
@@ -376,7 +374,7 @@ Isso gera comportamento incorreto.
 
 ⸻
 
-Errado
+### Errado
 
 ```python
 fator = 10
@@ -397,7 +395,7 @@ O cache pode continuar retornando o valor antigo, porque:
 
 ⸻
 
-Correto
+### Correto
 
 ```python
 @st.cache_data
@@ -413,17 +411,17 @@ Agora:
 
 ⸻
 
-Regra mental
+### Regra mental
 
 Tudo que influencia o resultado deve ser parâmetro da função.
 
 ⸻
 
-3 Performance Estrutural
+# 3 Performance Estrutural
 
 ⸻
 
-3.1 Separação de responsabilidades
+## 3.1 Separação de responsabilidades
 
 Misturar tudo em sequência cria acoplamento forte.
 
@@ -474,7 +472,7 @@ Agora:
 
 ⸻
 
-3.2 Evite recomputação dentro de widgets
+## 3.2 Evite recomputação dentro de widgets
 
 Widgets disparam rerun.
 
@@ -482,7 +480,7 @@ Se você colocar processamento pesado logo após um widget, ele será reexecutad
 
 ⸻
 
-3.3 Uso inteligente de session_state
+## 3.3 Uso inteligente de session_state
 
 Centralize estado:
 
@@ -493,7 +491,7 @@ Isso evita recalcular filtros pesados a cada ajuste fino.
 
 ⸻
 
-3.4 Lazy loading
+## 3.4 Lazy loading
 
 Carregue apenas quando necessário:
 
@@ -504,7 +502,7 @@ Evita custo inicial alto.
 
 ⸻
 
-4 Conectividade
+# 4 Conectividade
 
 Aplicações reais precisam integrar:
 	•	APIs REST
@@ -514,7 +512,7 @@ Aplicações reais precisam integrar:
 
 ⸻
 
-4.1 Conectando APIs
+## 4.1 Conectando APIs
 
 @st.cache_data(ttl=600)
 def buscar_api():
@@ -528,7 +526,7 @@ Boas práticas:
 
 ⸻
 
-4.2 Conexão com Banco de Dados
+## 4.2 Conexão com Banco de Dados
 
 Padrão recomendado:
 
@@ -546,7 +544,7 @@ Separar conexão (resource) de query (data).
 
 ⸻
 
-4.3 Secrets Management
+## 4.3 Secrets Management
 
 Nunca hardcode credenciais.
 
@@ -562,7 +560,7 @@ Essencial para produção.
 
 ⸻
 
-4.4 Conectando modelos externos
+## 4.4 Conectando modelos externos
 
 Exemplo: OpenAI, AWS, Azure etc.
 
@@ -573,9 +571,9 @@ Use:
 
 ⸻
 
-5 Performance em Produção
+# 5 Performance em Produção
 
-5.1 Escalabilidade
+## 5.1 Escalabilidade
 
 Streamlit Community Cloud:
 	•	Instâncias limitadas
@@ -590,7 +588,7 @@ Deploy corporativo:
 
 ⸻
 
-5.2 Monitoramento
+## 5.2 Monitoramento
 
 Observe:
 	•	Tempo de resposta
@@ -600,7 +598,7 @@ Observe:
 
 ⸻
 
-5.3 Checklist de Aplicação Performática
+## 5.3 Checklist de Aplicação Performática
 	•	Dados cacheados
 	•	Recursos cacheados
 	•	Sem mutação de cache
@@ -611,7 +609,7 @@ Observe:
 
 ⸻
 
-Referências
+# Referências
 
 Documentação base utilizada:
 	•	Streamlit Caching:
