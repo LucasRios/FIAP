@@ -144,25 +144,25 @@ def carregar_dados():
 ```
 
 Como funciona internamente?
-	- Streamlit cria hash da função + parâmetros.
-	- Armazena resultado em memória.
-	- Se entrada não mudar → retorna do cache.
-	- Se mudar → recalcula.
+- Streamlit cria hash da função + parâmetros.
+- Armazena resultado em memória.
+- Se entrada não mudar → retorna do cache.
+- Se mudar → recalcula.
 
 Características:
-	- Imutável
-	- Seguro para múltiplos usuários
-	- Ideal para dados
+- Imutável
+- Seguro para múltiplos usuários
+- Ideal para dados
 
 ⸻
 
 ## 2.2 st.cache_resource
 
 Usado para:
-	- Modelos de IA
-	- Conexões de banco
-	- Clientes de API
-	- Objetos pesados
+- Modelos de IA
+- Conexões de banco
+- Clientes de API
+- Objetos pesados
 
 Exemplo:
 
@@ -175,14 +175,12 @@ def carregar_modelo():
 Diferença conceitual:
 
 cache_data	
-Guarda resultado	
-Serializa	
-Ideal para dados	
+
+Guarda resultado | Serializa | Ideal para dados	
 
 cache_resource
-Guarda instância
-Mantém objeto vivo
-Ideal para recursos
+
+Guarda instância | Mantém objeto vivo | Ideal para recursos
 
 ⸻
 
@@ -201,26 +199,26 @@ def carregar_api():
 ```
 
 Aqui estamos dizendo:
-	- O resultado dessa função pode ser reutilizado por 3600 segundos (1 hora).
-	- Após esse período, na próxima chamada, o Streamlit ignora o valor armazenado.
-	- A função é executada novamente.
-	- O novo resultado substitui o antigo no cache.
+- O resultado dessa função pode ser reutilizado por 3600 segundos (1 hora).
+- Após esse período, na próxima chamada, o Streamlit ignora o valor armazenado.
+- A função é executada novamente.
+- O novo resultado substitui o antigo no cache.
 
 ⸻
 
 O que acontece na prática?
 
 Sem TTL:
-	- Se os parâmetros não mudarem, o cache pode durar indefinidamente.
-	- Mesmo que os dados externos tenham sido atualizados.
+- Se os parâmetros não mudarem, o cache pode durar indefinidamente.
+- Mesmo que os dados externos tenham sido atualizados.
 
 Com TTL:
-	1.	A função é chamada.
-	2.	O resultado é salvo junto com um timestamp.
-	3.	Durante o período definido, o valor é reutilizado.
-	4.	Quando o tempo expira:
-	- O próximo acesso dispara novo cálculo.
-	- O cache é atualizado automaticamente.
+1.	A função é chamada.
+2.	O resultado é salvo junto com um timestamp.
+3.	Durante o período definido, o valor é reutilizado.
+4.	Quando o tempo expira:
+- O próximo acesso dispara novo cálculo.
+- O cache é atualizado automaticamente.
 
 Importante:
 O TTL não executa a função automaticamente ao expirar.
@@ -231,22 +229,22 @@ Ele apenas força o recálculo na próxima vez que a função for chamada.
 Por que isso é essencial?
 
 Streamlit é muito usado para:
-	- Dashboards de monitoramento
-	- Métricas operacionais
-	- Dados financeiros
-	- Integração com APIs externas
+- Dashboards de monitoramento
+- Métricas operacionais
+- Dados financeiros
+- Integração com APIs externas
 
 Esses dados mudam com o tempo.
 
 Se você usar cache sem TTL:
-	- O app pode mostrar informações desatualizadas.
-	- O usuário pode tomar decisões com base em dados antigos.
+- O app pode mostrar informações desatualizadas.
+- O usuário pode tomar decisões com base em dados antigos.
 
 TTL equilibra:
 
-✔ Performance
-✔ Atualização automática
-✔ Redução de chamadas externas
+- Performance
+- Atualização automática
+- Redução de chamadas externas
 
 ⸻
 
@@ -254,25 +252,25 @@ Como escolher o valor de TTL?
 
 Depende do tipo de dado:
 
-Tipo de dado	TTL sugerido
-Dados quase estáticos	Horas ou dias
-Dados operacionais	Minutos
-Monitoramento em tempo real	Segundos
-APIs caras	TTL maior para reduzir custo
+Tipo de dado | TTL sugerido
+- Dados quase estáticos -> Horas ou dias
+- Dados operacionais -> Minutos
+- Monitoramento em tempo real -> Segundos
+- APIs caras -> TTL maior para reduzir custo
 
 ⸻
 
 Relação entre TTL e custo
 
 Em APIs pagas (OpenAI, serviços financeiros, etc.):
-	- Cada chamada tem custo.
-	- Sem TTL → cada interação pode gerar nova chamada.
-	- Com TTL → múltiplos usuários reutilizam o mesmo resultado durante o período.
+- Cada chamada tem custo.
+- Sem TTL → cada interação pode gerar nova chamada.
+- Com TTL → múltiplos usuários reutilizam o mesmo resultado durante o período.
 
 Isso reduz drasticamente:
-	- Latência
-	- Consumo de recursos
-	- Custo financeiro
+- Latência
+- Consumo de recursos
+- Custo financeiro
 
 ⸻
 
@@ -283,16 +281,16 @@ Pergunta estratégica:
 Com que frequência esse dado realmente precisa ser atualizado?
 
 Se a resposta for:
-	- “A cada clique” → talvez não devesse ser cacheado.
-	- “A cada alguns minutos” → TTL é ideal.
-	- “Raramente muda” → TTL longo ou sem TTL.
+- “A cada clique” → talvez não devesse ser cacheado.
+- “A cada alguns minutos” → TTL é ideal.
+- “Raramente muda” → TTL longo ou sem TTL.
 
 ⸻
 
 TTL é o mecanismo que transforma cache em algo inteligente.
 
-Sem TTL → performance máxima, risco de desatualização.
-Com TTL → equilíbrio entre velocidade e confiabilidade.
+- Sem TTL → performance máxima, risco de desatualização.
+- Com TTL → equilíbrio entre velocidade e confiabilidade.
 
 ⸻
 
@@ -301,9 +299,9 @@ Com TTL → equilíbrio entre velocidade e confiabilidade.
 st.cache_data.clear()
 ``` 
 Útil em:
-	- Atualizações administrativas
-	- Reset de ambiente
-	- Debug
+- Atualizações administrativas
+- Reset de ambiente
+- Debug
 
 ⸻
 
@@ -336,10 +334,10 @@ df["nova_coluna"] = df["valor"] * 2
 ```
 
 O que acontece:
-	- carregar_dados() retorna o mesmo objeto salvo no cache.
-	- Ao adicionar nova_coluna, você modifica o objeto original.
-	- No próximo rerun, essa coluna já existirá.
-	- Se repetir a operação, pode gerar erro ou duplicação.
+- carregar_dados() retorna o mesmo objeto salvo no cache.
+- Ao adicionar nova_coluna, você modifica o objeto original.
+- No próximo rerun, essa coluna já existirá.
+- Se repetir a operação, pode gerar erro ou duplicação.
 
 ⸻
 
@@ -373,8 +371,8 @@ Sempre trate como imutável.
 O problema
 
 O cache do Streamlit é baseado em:
-	- Código da função
-	- Parâmetros declarados
+- Código da função
+- Parâmetros declarados
 
 Se sua função depender de algo externo que não está nos parâmetros, o cache pode não perceber mudanças.
 
@@ -398,8 +396,8 @@ Se você mudar:
 fator = 20
 
 O cache pode continuar retornando o valor antigo, porque:
-	- O parâmetro fator não faz parte da assinatura da função.
-	- O hash da função não detecta essa mudança corretamente.
+- O parâmetro fator não faz parte da assinatura da função.
+- O hash da função não detecta essa mudança corretamente.
 
 ⸻
 
@@ -413,9 +411,9 @@ def transformar(df, fator):
 resultado = transformar(df, fator)
 ```
 Agora:
-	- O valor de fator faz parte da chave de cache.
-	- Se ele mudar → o cache é invalidado automaticamente.
-	- Comportamento previsível.
+- O valor de fator faz parte da chave de cache.
+- Se ele mudar → o cache é invalidado automaticamente.
+- Comportamento previsível.
 
 ⸻
 
@@ -444,9 +442,9 @@ st.line_chart(resultado)
 ```
 
 Problemas:
-	- Não está claro o que é dado, recurso ou visualização.
-	- Difícil testar partes isoladamente.
-	- Se algo mudar, tudo pode ser reexecutado.
+- Não está claro o que é dado, recurso ou visualização.
+- Difícil testar partes isoladamente.
+- Se algo mudar, tudo pode ser reexecutado.
 
 ⸻
 
@@ -474,9 +472,9 @@ st.line_chart(resultado)
 ```
 
 Agora:
-	- Cada parte tem responsabilidade clara.
-	- Cada camada pode ser cacheada de forma independente.
-	- O código escala melhor.
+- Cada parte tem responsabilidade clara.
+- Cada camada pode ser cacheada de forma independente.
+- O código escala melhor.
 
 ⸻
 
@@ -513,10 +511,10 @@ Evita custo inicial alto.
 # 4 Conectividade
 
 Aplicações reais precisam integrar:
-	- APIs REST
-	- Bancos SQL
-	- Serviços de IA
-	- Armazenamento em nuvem
+- APIs REST
+- Bancos SQL
+- Serviços de IA
+- Armazenamento em nuvem
 
 ⸻
 
@@ -528,9 +526,9 @@ def buscar_api():
     return response.json()
 ``` 
 Boas práticas:
-	- Sempre usar cache.
-	- Tratar timeout.
-	- Validar status code.
+- Sempre usar cache.
+- Tratar timeout.
+- Validar status code.
 
 ⸻
 
@@ -573,9 +571,9 @@ Essencial para produção.
 Exemplo: OpenAI, AWS, Azure etc.
 
 Use:
-	- cache_resource para cliente
-	- cache_data para respostas se apropriado
-	- TTL para evitar custo excessivo
+- cache_resource para cliente
+- cache_data para respostas se apropriado
+- TTL para evitar custo excessivo
 
 ⸻
 
@@ -584,25 +582,25 @@ Use:
 ## 5.1 Escalabilidade
 
 Streamlit Community Cloud:
-	- Instâncias limitadas
-	- Recursos limitados
-	- Ideal para protótipo
+- Instâncias limitadas
+- Recursos limitados
+- Ideal para protótipo
 
 Deploy corporativo:
-	- Docker
-	- Kubernetes
-	- Reverse proxy
-	- Autoscaling
+- Docker
+- Kubernetes
+- Reverse proxy
+- Autoscaling
 
 ⸻
 
 ## 5.2 Monitoramento
 
 Observe:
-	- Tempo de resposta
-	- Uso de memória
-	- Frequência de rerun
-	- Logs de erro
+- Tempo de resposta
+- Uso de memória
+- Frequência de rerun
+- Logs de erro
 
 ⸻
 
