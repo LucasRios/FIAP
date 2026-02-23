@@ -292,9 +292,9 @@ Com TTL → equilíbrio entre velocidade e confiabilidade.
 ⸻
 
 ## 2.4 Invalidação manual
-
+```python
 st.cache_data.clear()
-
+``` 
 Útil em:
 	•	Atualizações administrativas
 	•	Reset de ambiente
@@ -339,11 +339,14 @@ O que acontece:
 ⸻
 
 ### Correto
-
+```python
 df = carregar_dados().copy()
+```
 
-# Agora você trabalha em uma cópia independente
+Agora você trabalha em uma cópia independente
+```python
 df["nova_coluna"] = df["valor"] * 2
+```
 
 O .copy() cria uma nova instância em memória.
 
@@ -483,10 +486,10 @@ Se você colocar processamento pesado logo após um widget, ele será reexecutad
 ## 3.3 Uso inteligente de session_state
 
 Centralize estado:
-
+```python
 if "dados_filtrados" not in st.session_state:
     st.session_state.dados_filtrados = df
-
+``` 
 Isso evita recalcular filtros pesados a cada ajuste fino.
 
 ⸻
@@ -494,10 +497,10 @@ Isso evita recalcular filtros pesados a cada ajuste fino.
 ## 3.4 Lazy loading
 
 Carregue apenas quando necessário:
-
+```python
 if st.button("Carregar dados"):
     dados = carregar_dados()
-
+``` 
 Evita custo inicial alto.
 
 ⸻
@@ -513,12 +516,12 @@ Aplicações reais precisam integrar:
 ⸻
 
 ## 4.1 Conectando APIs
-
+```python
 @st.cache_data(ttl=600)
 def buscar_api():
     response = requests.get("https://api.exemplo.com")
     return response.json()
-
+``` 
 Boas práticas:
 	•	Sempre usar cache.
 	•	Tratar timeout.
@@ -529,17 +532,17 @@ Boas práticas:
 ## 4.2 Conexão com Banco de Dados
 
 Padrão recomendado:
-
+```python
 @st.cache_resource
 def conectar():
     return create_engine("postgresql://...")
-
+``` 
 Consulta:
-
+```python
 @st.cache_data
 def rodar_query(query):
     return pd.read_sql(query, conectar())
-
+``` 
 Separar conexão (resource) de query (data).
 
 ⸻
@@ -549,13 +552,13 @@ Separar conexão (resource) de query (data).
 Nunca hardcode credenciais.
 
 Use:
-
+```python
 .secrets.toml
-
+``` 
 Acesso:
-
+```python
 st.secrets["db_password"]
-
+``` 
 Essencial para produção.
 
 ⸻
@@ -599,27 +602,23 @@ Observe:
 ⸻
 
 ## 5.3 Checklist de Aplicação Performática
-	•	Dados cacheados
-	•	Recursos cacheados
-	•	Sem mutação de cache
-	•	Sem recomputação desnecessária
-	•	Estado centralizado
-	•	Credenciais protegidas
-	•	TTL configurado para APIs
+
+•	Dados cacheados
+•	Recursos cacheados
+•	Sem mutação de cache
+•	Sem recomputação desnecessária
+•	Estado centralizado
+•	Credenciais protegidas
+•	TTL configurado para APIs
 
 ⸻
 
 # Referências
 
 Documentação base utilizada:
-	•	Streamlit Caching:
-https://docs.streamlit.io/develop/concepts/architecture/caching
-	•	Execution Flow:
-https://docs.streamlit.io/develop/concepts/architecture
-	•	Session State:
-https://docs.streamlit.io/develop/api-reference/session-state
-	•	Secrets Management:
-https://docs.streamlit.io/develop/concepts/connections/secrets-management
-	•	Connecting to Data Sources:
-https://docs.streamlit.io/develop/concepts/connections
+	•	Streamlit Caching: https://docs.streamlit.io/develop/concepts/architecture/caching
+	•	Execution Flow: https://docs.streamlit.io/develop/concepts/architecture
+	•	Session State: https://docs.streamlit.io/develop/api-reference/session-state
+	•	Secrets Management: https://docs.streamlit.io/develop/concepts/connections/secrets-management
+	•	Connecting to Data Sources: https://docs.streamlit.io/develop/concepts/connections
 
