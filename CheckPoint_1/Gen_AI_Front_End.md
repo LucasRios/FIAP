@@ -8,23 +8,23 @@ https://github.com/erickfog/GENERATIVE_AI_ADVANCED_NETS/tree/main/Aula03
 
 ## Objetivo
 
-Instalar e executar o modelo;
-Utilizar o app.py como ponto de partida para entender a aplicação do modelo.
-A partir do app.py você deverá modificá-lo (ou criar um novo sobre um template que você tenha familiaridade), a fim de implementar os conceitos de design com recursos do streamlit aplicados durante as aulas.
+- Instalar e executar o modelo;
+- Utilizar o app.py como ponto de partida para entender a aplicação do modelo.
+- A partir do app.py você deverá modificá-lo (ou criar um novo sobre um template que você tenha familiaridade), a fim de implementar os conceitos de design com recursos do streamlit aplicados durante as aulas.
 
 ## Ponto de partida
 Dentro do app.py existe o trecho
 
-```phyton
+```python
 
 st.set_page_config(page_title='VAE PneumoniaMNIST - Triagem e Geração', layout='wide')
 st.title('VAE PneumoniaMNIST - Triagem de Pneumonia e Geração de Imagens')
 
 ```
 
-Tudo que vem antes disso são funções de execução do modelo.
-Tudo que vem depois disso é a construção e interação da interface.
-Para aplicar alguns conceitos do design, pode ser necessário modificar parâmetros de entrada das funções, ou retornos esperados.
+- Tudo que vem antes disso são funções de execução do modelo.
+- Tudo que vem depois disso é a construção e interação da interface.
+- Para aplicar alguns conceitos do design, pode ser necessário modificar parâmetros de entrada das funções, ou retornos esperados.
 
 ## Resultados Esperados por tema
 
@@ -163,7 +163,7 @@ Para aplicar alguns conceitos do design, pode ser necessário modificar parâmet
 -   Callback para resetar análise
 -   Controle arquitetural claro:
     -   Estado controla UI | UI reflete estado -> Empty state e só depois da interação mostrar resultados.
--   Nenhum comportamento inconsistente causado por re-run. Por exemplo, interface perder o resultado porque o usuário clicou em um feddback positivo ou negativo.
+-   Nenhum comportamento inconsistente causado por re-run. Por exemplo, interface perder o resultado porque o usuário clicou em um feedback positivo ou negativo.
 
  
 ------------------------------------------------------------------------
@@ -204,3 +204,4 @@ Para aplicar alguns conceitos do design, pode ser necessário modificar parâmet
     -   Recursos
 -   Nenhuma reexecução desnecessária
 -   Arquitetura pensada para evitar bloqueios no topo do script
+
