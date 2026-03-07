@@ -1,3 +1,7 @@
+# Projeto com app.py comentado para sevir de guia para entrega do checkpoint 1
+
+
+
 # 🔬 VAE PneumoniaMNIST - Triagem de Pneumonia e Geração de Imagens
 
 Um projeto completo de **Variational Autoencoder (VAE)** treinado no dataset PneumoniaMNIST para triagem de pneumonia e geração de imagens sintéticas de raio-X.
