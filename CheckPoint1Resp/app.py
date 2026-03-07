@@ -328,10 +328,10 @@ if st.session_state.analysis_ran:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Imagem Original")
-            st.image(x[0].squeeze(), clamp=True,width="300")
+            st.image(x[0].squeeze(), clamp=True,width=300)
         with col2:
             st.subheader("Reconstrução VAE")
-            st.image(recon[0].squeeze(), clamp=True,width="300")
+            st.image(recon[0].squeeze(), clamp=True,width=300)
 
         st.markdown("---")
         st.subheader("📊 Resultado da Triagem")
@@ -416,7 +416,7 @@ if st.session_state.analysis_ran:
                         st.session_state.generated_images[i].squeeze(),
                         clamp=True,
                         caption=f"Imagem {i + 1}",
-                        width="300",
+                        width=300,
                     )
 
     # ==========================================================
