@@ -584,5 +584,334 @@ Pipelines e providers podem ser testados isoladamente.
 
 # 9. Relação com o app construído em aula
 
+### app.py
+``` python
+
+import streamlit as st
+from state.session import init_session
+from ui.sidebar import render_sidebar
+
+# 1. Configuração Global
+st.set_page_config(page_title="AI News Analyzer", layout="wide")
+
+# 2. Estado
+init_session()
+
+# 3. UI (Sidebar e Navegação)
+page_id = render_sidebar()
+
+# 4. Roteamento de Features
+if page_id == "analysis":
+    from features.news_analysis.page import render
+elif page_id == "history":
+    from features.history.page import render
+else:
+    from features.settings.page import render
+
+render()
 
 
+```
+
+### ui/sidebar.py
+``` python
+import streamlit as st
+
+def render_sidebar():
+    st.sidebar.title("AI News Analyzer")
+    
+    # Mapeamento Centralizado
+    pages = {
+        "Analisar notícia": "analysis",
+        "Histórico": "history",
+        "Configurações": "settings"
+    }
+    
+    choice = st.sidebar.selectbox(
+        "Navegação",
+        list(pages.keys())
+    )
+    
+    return pages[choice]
+
+```
+
+### state/session.py
+``` python
+import streamlit as st
+
+def render_sidebar():
+    st.sidebar.title("AI News Analyzer")
+    
+    # Mapeamento Centralizado
+    pages = {
+        "Analisar notícia": "analysis",
+        "Histórico": "history",
+        "Configurações": "settings"
+    }
+    
+    choice = st.sidebar.selectbox(
+        "Navegação",
+        list(pages.keys())
+    )
+    
+    return pages[choice]
+
+```
+
+### providers/llm_provider.py
+``` python
+import streamlit as st
+import time
+
+@st.cache_data
+def summarize_text(context, model):
+
+    time.sleep(1)
+
+    return f"Resumo gerado pelo modelo {model} baseado no conteúdo analisado."
+
+```
+
+### providers/rag_provider.py
+``` python
+import streamlit as st
+
+@st.cache_data
+def run_rag(text):
+
+    chunks = text.split(".")[:10]
+
+    context = " ".join(chunks)
+
+    return context
+
+```
+
+### providers/scraper_provider.py
+``` python
+import requests
+from bs4 import BeautifulSoup
+import streamlit as st
+
+@st.cache_data(ttl=3600)
+def scrape_news(url):
+
+    response = requests.get(url)
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    paragraphs = soup.find_all("p")
+
+    text = " ".join([p.get_text() for p in paragraphs])
+
+    return text
+
+```
+
+### pipelines/news_pipeline.py
+``` python
+from providers.scraper_provider import scrape_news
+from providers.rag_provider import run_rag
+from providers.llm_provider import summarize_text
+
+def analyze_news(url, model):
+
+    article = scrape_news(url)
+
+    context = run_rag(article)
+
+    summary = summarize_text(context, model)
+
+    return {
+        "article": article,
+        "summary": summary
+    }
+```
+
+### features/history/page.py
+``` python
+import streamlit as st
+import pandas as pd
+
+def render():
+
+    st.title("Histórico de análises")
+
+    history = st.session_state.history
+
+    if len(history) == 0:
+        st.info("Nenhuma análise registrada.")
+        return
+
+    df = pd.DataFrame(history)
+
+    st.subheader("Histórico completo")
+
+    st.dataframe(df)
+
+    st.markdown("---")
+
+    # ==========================
+    # Gráfico de feedback
+    # ==========================
+
+    if "feedback" in df.columns:
+
+        st.subheader("Distribuição de Feedback")
+
+        feedback_counts = (
+            df["feedback"]
+            .value_counts()
+            .rename_axis("Tipo")
+            .reset_index(name="Quantidade")
+        )
+
+        feedback_counts = feedback_counts.set_index("Tipo")
+
+        st.bar_chart(feedback_counts)
+
+    st.markdown("---")
+
+    # ==========================
+    # Visualizar resumo salvo
+    # ==========================
+
+    idx = st.selectbox(
+        "Selecionar análise",
+        df.index
+    )
+
+    st.subheader("Resumo")
+
+    st.write(df.loc[idx]["summary"])
+```
+
+### features/news_analysis/page.py
+``` python
+
+import streamlit as st
+from .controller import run_analysis
+
+def render():
+
+    st.title("Análise de Notícias com IA")
+
+    url = st.text_input(
+        "URL da notícia",
+        key="url_input"
+    )
+
+    st.button(
+        "Executar análise",
+        on_click=run_analysis
+    )
+
+    if not st.session_state.summary:
+        st.info("Insira uma URL para iniciar.")
+        return
+
+    tab1, tab2  = st.tabs([
+        "Resumo",
+        "Texto extraído" 
+    ])
+
+    with tab1:
+
+        st.subheader("Resumo da notícia")
+
+        placeholder = st.empty()
+
+        text = ""
+
+        for word in st.session_state.summary.split():
+            text += word + " "
+            placeholder.write(text)
+
+        st.subheader("Feedback")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            if st.button("👍 útil"): 
+                st.session_state.history.append({
+                    "url": st.session_state.current_url,
+                    "summary": st.session_state.summary,
+                    "feedback": "positivo"
+                })
+                st.success("Obrigado pelo feedback!")
+
+        with col2:
+            if st.button("👎 ruim"): 
+                st.session_state.history.append({
+                    "url": st.session_state.current_url,
+                    "summary": st.session_state.summary,
+                    "feedback": "negativo"
+                }) 
+                st.error("Obrigado pelo feedback!")           
+
+    with tab2:
+
+        st.subheader("Texto da notícia")
+
+        st.text_area(
+            "Conteúdo",
+            st.session_state.article_text,
+            height=300
+        )
+
+
+```
+
+### features/news_analysis/page.py
+``` python
+import streamlit as st
+from pipelines.news_pipeline import analyze_news
+
+def run_analysis():
+
+    url = st.session_state.url_input
+
+    result = analyze_news(
+        url,
+        st.session_state.model
+    )
+
+    st.session_state.article_text = result["article"]
+    st.session_state.summary = result["summary"]
+    st.session_state.current_url = url
+
+```
+
+### features/settings/page.py
+``` python
+import streamlit as st
+
+def render():
+
+    st.title("Configurações")
+
+    st.subheader("Modelo")
+
+    st.selectbox(
+        "Escolher modelo",
+        ["small", "medium", "large"],
+        key="model"
+    )
+
+    st.subheader("Parâmetros")
+
+    st.slider(
+        "Temperatura",
+        0.0,
+        1.0,
+        key="temperature"
+    )
+
+    if st.button("Limpar cache"):
+
+        st.cache_data.clear()
+
+        st.success("Cache limpo.")
+
+```
