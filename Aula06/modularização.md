@@ -917,9 +917,9 @@ def render():
 ```
 
 ## Referências
-Architecting AI Software Systems - Richard D. Avila, Imran Ahmad
-Orchestrating Agents and Data for Enterprise: A Blueprint Architecture for Compound AI - Eser Kandogan, Nikita Bhutani
-Pattern-Oriented Software Architecture - Frank Buschmann
+- Architecting AI Software Systems - Richard D. Avila, Imran Ahmad
+- Orchestrating Agents and Data for Enterprise: A Blueprint Architecture for Compound AI - Eser Kandogan, Nikita Bhutani
+- Pattern-Oriented Software Architecture - Frank Buschmann
 
 OpenAI — Building agents
 https://platform.openai.com/docs/guides/agents
@@ -941,4 +941,5 @@ https://www.thoughtworks.com/insights/blog/microservices/feature-driven-developm
 
 Stanford — Building LLM applications
 https://crfm.stanford.edu/
+
 
