@@ -917,17 +917,12 @@ def render():
 ```
 
 ## Referências
-OpenAI — Agents SDK documentation
-https://platform.openai.com/docs/agents
+Architecting AI Software Systems - Richard D. Avila, Imran Ahmad
+Orchestrating Agents and Data for Enterprise: A Blueprint Architecture for Compound AI - Eser Kandogan, Nikita Bhutani
+Pattern-Oriented Software Architecture - Frank Buschmann
 
 OpenAI — Building agents
 https://platform.openai.com/docs/guides/agents
-
-OpenAI — Function calling / tools
-https://platform.openai.com/docs/guides/function-calling
-
-LangChain Documentation
-https://python.langchain.com/docs/
 
 LangChain Architecture
 https://python.langchain.com/docs/concepts
@@ -935,14 +930,8 @@ https://python.langchain.com/docs/concepts
 LlamaIndex Architecture Overview
 https://docs.llamaindex.ai/en/stable/understanding/architecture/
 
-Microsoft — AI application architecture
-https://learn.microsoft.com/en-us/azure/architecture/ai-ml/
-
 Microsoft — Generative AI application patterns
 https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/genai-app-patterns
-
-Microsoft — Copilot stack architecture
-https://learn.microsoft.com/en-us/azure/ai-services/copilot/
 
 Feature-based architecture
 https://martinfowler.com/articles/modular-monolith.html
@@ -952,3 +941,4 @@ https://www.thoughtworks.com/insights/blog/microservices/feature-driven-developm
 
 Stanford — Building LLM applications
 https://crfm.stanford.edu/
+
