@@ -915,3 +915,40 @@ def render():
         st.success("Cache limpo.")
 
 ```
+
+## Referências
+OpenAI — Agents SDK documentation
+https://platform.openai.com/docs/agents
+
+OpenAI — Building agents
+https://platform.openai.com/docs/guides/agents
+
+OpenAI — Function calling / tools
+https://platform.openai.com/docs/guides/function-calling
+
+LangChain Documentation
+https://python.langchain.com/docs/
+
+LangChain Architecture
+https://python.langchain.com/docs/concepts
+
+LlamaIndex Architecture Overview
+https://docs.llamaindex.ai/en/stable/understanding/architecture/
+
+Microsoft — AI application architecture
+https://learn.microsoft.com/en-us/azure/architecture/ai-ml/
+
+Microsoft — Generative AI application patterns
+https://learn.microsoft.com/en-us/azure/architecture/ai-ml/guide/genai-app-patterns
+
+Microsoft — Copilot stack architecture
+https://learn.microsoft.com/en-us/azure/ai-services/copilot/
+
+Feature-based architecture
+https://martinfowler.com/articles/modular-monolith.html
+
+Feature-driven architecture
+https://www.thoughtworks.com/insights/blog/microservices/feature-driven-development
+
+Stanford — Building LLM applications
+https://crfm.stanford.edu/
