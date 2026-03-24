@@ -8,6 +8,8 @@
 import streamlit as st
 import pandas as pd
 
+from ui.charts import render_sentiment_chart
+
 
 def render():
     """
@@ -21,7 +23,7 @@ def render():
       [Visualização de análise individual selecionada]
     """
 
-    st.title("📋 Histórico de Análises")
+    st.title("Histórico de Análises")
     st.markdown("Consulte todas as notícias analisadas nesta sessão.")
     st.markdown("---")
 
@@ -87,8 +89,27 @@ def render():
 
         st.bar_chart(sentiment_counts)
 
-    st.markdown("---")
+        st.markdown("---")
 
+        # 2. IMPLEMENTAÇÃO DO GRÁFICO
+        st.markdown("---")
+        st.subheader("Gráfico de Distribuição")
+            
+        # Chamamos a função da UI passando os dados do session_state
+        # Contamos as ocorrências no DataFrame
+        counts = df["sentimento"].value_counts().to_dict()
+    
+        # Mapeamos para o formato que a função da UI espera
+        # (Ajuste as chaves para baterem com o que o provider usa: 'positive', etc)
+        dist_global = {
+            "positive": counts.get("Positivo", 0),
+            "neutral": counts.get("Neutro", 0),
+            "negative": counts.get("Negativo", 0)
+        }
+
+        if any(dist_global.values()):
+            render_sentiment_chart(dist_global)
+ 
     # ------------------------------------------------------------------
     # Seletor para visualizar uma análise específica do histórico
     # ------------------------------------------------------------------

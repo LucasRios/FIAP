@@ -17,7 +17,6 @@ def init_session():
 
     O Streamlit mantém st.session_state entre re-renders da mesma sessão,
     mas reseta tudo ao recarregar a página. Esta função usa o padrão
-    `setdefault` para não sobrescrever valores já definidos pelo usuário.
     """
 
     # ------------------------------------------------------------------
@@ -58,3 +57,9 @@ def init_session():
     # URL digitada pelo usuário (espelho do widget url_input)
     if "current_url" not in st.session_state:
         st.session_state.current_url = ""
+
+    if "df_final" not in st.session_state:
+        st.session_state.df_final = None
+        
+    if "analise" not in st.session_state:
+        st.session_state.analise = None        

@@ -7,6 +7,7 @@
 
 import streamlit as st 
 from pipelines.news_pipeline import analyze_news
+from ui.charts import render_sentiment_chart
 
 
 def render():
@@ -33,7 +34,7 @@ def render():
     url = st.text_input(
         "URL da notícia",
         placeholder="https://g1.globo.com/...",
-        key="url_input"    # chave no session_state — lida pelo controller
+        key="url_input"    # chave no session_state
     )
 
     # on_click= passa a função sem chamá-la; o Streamlit chama ao clicar
@@ -89,16 +90,17 @@ def render():
             with col_score:
                 st.metric(
                     label="Confiança do modelo",
-                    value=f"{sentiment['score'] * 100:.0f}%"
+                    value=f"{abs(sentiment['score']) * 100:.0f}%"
                 )
 
             # Barra de progresso visual para o score de confiança
-            st.progress(sentiment["score"])
+            st.progress(abs(sentiment["score"]))
 
             st.caption(
                 "ℹ️ A análise de sentimento indica o tom predominante da notícia "
                 "com base no conteúdo textual extraído."
             )
+ 
         else:
             st.info("Sentimento não disponível para esta análise.")
 
@@ -166,10 +168,7 @@ def _save_feedback(feedback_type: str):
         "feedback":  feedback_type,
     })
 
-@st.cache_data(ttl=3600)
-def get_analysis_result(url, model):
-    return analyze_news(url=url, model=model)
-  
+ 
 def run_analysis():
     """
     Callback chamado quando o usuário clica em "Executar análise".
@@ -185,20 +184,17 @@ def run_analysis():
     """
 
     url = st.session_state.get("url_input", "").strip()
-
-    # Validação básica: não executa com URL vazia
     if not url:
-        st.warning("Por favor, insira uma URL válida antes de analisar.")
+        st.warning("Insira uma URL.")
         return
 
-    # Executa a pipeline completa (scraping → RAG → LLM → sentimento) 
-    result = get_analysis_result(
-        url=url,
-        model=st.session_state.model
-    )
+    # Chama o pipeline (que agora está em /pipelines)
+    result = analyze_news(url=url)
 
-    # Persiste os resultados no estado da sessão para a page.py renderizar
-    st.session_state.article_text = result["article"]
-    st.session_state.summary      = result["summary"]
-    st.session_state.sentiment    = result["sentiment"]
-    st.session_state.current_url  = url
+    if result:
+        st.session_state.article_text = result["article"]
+        st.session_state.summary      = result["summary"]
+        st.session_state.sentiment    = result["sentiment"]
+        st.session_state.current_url  = url
+    else:
+        st.error("Não foi possível analisar esta URL.")

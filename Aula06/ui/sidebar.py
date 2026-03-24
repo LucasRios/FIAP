@@ -15,16 +15,14 @@ def render_sidebar():
     st.sidebar.subheader("Navegação")
     
     # Criando botões que funcionam como links de navegação
-    if st.sidebar.button("🔍 Analisar Notícia", use_container_width=True):
+    if st.sidebar.button("Analisar Notícia", use_container_width=True):
         st.session_state.page = "analysis"
     
-    if st.sidebar.button("📜 Histórico", use_container_width=True):
+    if st.sidebar.button("Histórico", use_container_width=True):
         st.session_state.page = "history"
         
-    if st.sidebar.button("⚙️ Configurações", use_container_width=True):
+    if st.sidebar.button("Configurações", use_container_width=True):
         st.session_state.page = "settings"
-        
-    st.sidebar.markdown("---")
-    st.sidebar.caption("Desenvolvido para a aula de Arquitetura de IA")
+         
     
     return st.session_state.page
