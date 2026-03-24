@@ -588,51 +588,83 @@ Pipelines e providers podem ser testados isoladamente.
 ``` python
 
 # =============================================================================
-# app.py — Ponto de entrada da aplicação
-#
-# Responsabilidade: orquestrar o roteamento entre páginas.
-# Este arquivo NÃO contém lógica de negócio nem de UI detalhada.
-# Ele apenas inicializa o estado e delega a renderização para cada feature.
+# ARQUIVO: app.py — O Maestro da Aplicação
+# =============================================================================
+# Responsabilidade: Este é o "Ponto de Entrada" (Entry Point). 
+# Imagine que ele é o recepcionista de um prédio: ele sabe onde cada sala 
+# está e direciona o usuário, mas não faz o trabalho técnico de cada sala.
 # =============================================================================
 
-import streamlit as st
+import streamlit as st  # Importa o framework principal para criar a interface web
 
-# Configuração global da página (deve ser a 1ª chamada Streamlit)
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÃO GLOBAL DA PÁGINA
+# -----------------------------------------------------------------------------
+# O Streamlit exige que esta seja a PRIMEIRA instrução de interface.
+# Ela define o que aparece na aba do navegador e como o layout se comporta.
 st.set_page_config(
-    page_title="AI News Analyzer",
-    page_icon="📰",
-    layout="wide"
+    page_title="AI News Analyzer",  # Título que aparece na aba do navegador
+    page_icon="📰",                 # Ícone (favicon) da aba
+    layout="wide"                   # Usa toda a largura da tela (melhor para dashboards)
 )
 
-# Módulos internos da aplicação
-from state.session import init_session          # Inicializa variáveis de sessão
-from ui.sidebar import render_sidebar           # Renderiza o menu lateral
+# -----------------------------------------------------------------------------
+# IMPORTAÇÃO DE MÓDULOS INTERNOS (A nossa estrutura de pastas)
+# -----------------------------------------------------------------------------
+# Aqui estamos trazendo as peças de outras pastas para dentro do app principal.
+# Isso mantém o código organizado e fácil de dar manutenção.
+
+# 1. Gerenciamento de Memória: Inicializa variáveis que o app precisa "lembrar"
+from state.session import init_session          
+
+# 2. Navegação: Traz o componente visual do menu lateral
+from ui.sidebar import render_sidebar           
+
+# 3. Páginas/Funcionalidades: Cada variável abaixo representa uma "tela" do sistema
 from features.news_analysis import page as analysis_page
 from features.history import page as history_page
 from features.settings import page as settings_page
 
 # -----------------------------------------------------------------------------
-# 1. Inicializar estado da sessão (só executa se ainda não existir)
+# PASSO 1: INICIALIZAR O ESTADO (Session State)
 # -----------------------------------------------------------------------------
+# O Streamlit "recarrega" o script do zero a cada clique. 
+# Chamamos init_session() para garantir que variáveis globais (como logins ou 
+# histórico) não sejam apagadas a cada interação do usuário.
 init_session()
 
 # -----------------------------------------------------------------------------
-# 2. Renderizar sidebar e capturar a página ativa
-#    A sidebar retorna um identificador string, ex: "analysis"
+# PASSO 2: RENDERIZAR O MENU LATERAL (Sidebar)
 # -----------------------------------------------------------------------------
+# Chamamos a função que desenha os botões/links no lado esquerdo.
+# Ela foi programada para nos devolver (return) o nome da página que o usuário clicou.
+# Exemplo: Se o usuário clicou em "Histórico", a variável current_page será "history".
 current_page = render_sidebar()
 
 # -----------------------------------------------------------------------------
-# 3. Roteamento: chama render() da feature correspondente
+# PASSO 3: ROTEAMENTO (Decidir qual tela mostrar)
 # -----------------------------------------------------------------------------
+# Aqui usamos uma estrutura condicional simples (if/elif) para "desenhar" a tela certa.
+# Cada página tem uma função .render() que contém todo o conteúdo visual daquela seção.
+
+# Se a página ativa for a de análise:
 if current_page == "analysis":
     analysis_page.render()
 
+# Se o usuário escolheu ver o histórico:
 elif current_page == "history":
     history_page.render()
 
+# Se o usuário clicou em configurações:
 elif current_page == "settings":
     settings_page.render()
+
+# -----------------------------------------------------------------------------
+# Para adicionar uma nova página, você precisaria de 3 passos:
+# 1. Criar o arquivo na pasta /features.
+# 2. Importar ele aqui no topo do app.py.
+# 3. Adicionar um novo 'elif' para chamar o .render() dele.
+# -----------------------------------------------------------------------------
 
 
 ```
@@ -656,17 +688,15 @@ def render_sidebar():
     st.sidebar.subheader("Navegação")
     
     # Criando botões que funcionam como links de navegação
-    if st.sidebar.button("🔍 Analisar Notícia", use_container_width=True):
+    if st.sidebar.button("Analisar Notícia", use_container_width=True):
         st.session_state.page = "analysis"
     
-    if st.sidebar.button("📜 Histórico", use_container_width=True):
+    if st.sidebar.button("Histórico", use_container_width=True):
         st.session_state.page = "history"
         
-    if st.sidebar.button("⚙️ Configurações", use_container_width=True):
+    if st.sidebar.button("Configurações", use_container_width=True):
         st.session_state.page = "settings"
-        
-    st.sidebar.markdown("---")
-    st.sidebar.caption("Desenvolvido para a aula de Arquitetura de IA")
+         
     
     return st.session_state.page
 
@@ -693,7 +723,6 @@ def init_session():
 
     O Streamlit mantém st.session_state entre re-renders da mesma sessão,
     mas reseta tudo ao recarregar a página. Esta função usa o padrão
-    `setdefault` para não sobrescrever valores já definidos pelo usuário.
     """
 
     # ------------------------------------------------------------------
@@ -735,260 +764,372 @@ def init_session():
     if "current_url" not in st.session_state:
         st.session_state.current_url = ""
 
+    if "df_final" not in st.session_state:
+        st.session_state.df_final = None
+        
+    if "analise" not in st.session_state:
+        st.session_state.analise = None        
+
+
 
 ```
 
-### providers/llm_provider.py
+### providers/scraper_nlp_provider.py
 ``` python
 # =============================================================================
-# providers/llm_provider.py — Integração com o modelo de linguagem (LLM)
+# providers/scraper_nlp_provider.py
 #
-# Responsabilidade: receber contexto processado e retornar resumo e análise
-# de sentimento. Este provider ISOLA a dependência do modelo — se trocar de
-# OpenAI para Gemini, só este arquivo muda.
+# PROVIDER DE COLETA E ANÁLISE NLP — Scraping, limpeza e análise de sentimento
+# via léxico local (sem dependência de API externa).
 #
-# SIMULAÇÃO: Neste projeto as funções simulam as respostas do modelo com
-# texto fixo + delay, para focar no aprendizado da arquitetura Streamlit.
-# Para integrar um LLM real, substitua o corpo das funções pela chamada
-# à API correspondente (openai.chat.completions.create, etc.)
-# =============================================================================
- 
-import time
-import random
-
- 
-def summarize_text(context: str, model: str) -> str:
-    """
-    Gera um resumo do contexto usando o modelo especificado.
-
-    Em produção, aqui entraria a chamada real ao LLM:
-        response = openai.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": f"Resuma: {context}"}]
-        )
-        return response.choices[0].message.content
-
-    Args:
-        context (str): Texto reduzido pelo RAG provider
-        model   (str): Identificador do modelo escolhido nas configurações
-
-    Returns:
-        str: Resumo gerado pelo modelo
-    """
-
-    # Simula o tempo de processamento do modelo
-    time.sleep(1)
-
-    # Resumo simulado — em produção viria da API do LLM
-    return (
-        f"[Modelo: {model.upper()}] Esta notícia aborda um tema de grande relevância "
-        "para o cenário atual. Os principais pontos destacados incluem impactos "
-        "econômicos, desdobramentos políticos e repercussão nas redes sociais. "
-        "Especialistas ouvidos pela reportagem divergem sobre as consequências "
-        "de longo prazo, mas concordam que o assunto demanda atenção imediata "
-        "da sociedade e das autoridades competentes."
-    )
-
- 
-def analyze_sentiment(context: str) -> dict:
-    """
-    Analisa o sentimento predominante no texto da notícia.
-
-    Retorna um dicionário padronizado com:
-      - label (str):  rótulo do sentimento em português
-      - score (float): confiança do modelo (0.0 a 1.0)
-      - emoji (str):  emoji representativo para exibição na UI
-
-    Em produção, usaríamos um modelo de NLP (ex: HuggingFace Transformers):
-        from transformers import pipeline
-        nlp = pipeline("sentiment-analysis", model="neuralmind/bert-base-portuguese-cased")
-        result = nlp(context[:512])[0]
-
-    Args:
-        context (str): Texto ou contexto da notícia
-
-    Returns:
-        dict: {"label": str, "score": float, "emoji": str}
-    """
-
-    # Simula tempo de inferência do modelo de NLP
-    time.sleep(0.5)
-
-    # Possíveis resultados simulados — em produção viria do modelo real
-    # Usamos random para variar o resultado a cada nova URL analisada. 
-    sentiments = [
-        {"label": "Positivo",  "score": round(random.uniform(0.75, 0.97), 2), "emoji": "😊"},
-        {"label": "Negativo",  "score": round(random.uniform(0.70, 0.95), 2), "emoji": "😟"},
-        {"label": "Neutro",    "score": round(random.uniform(0.60, 0.85), 2), "emoji": "😐"},
-        {"label": "Alarmista", "score": round(random.uniform(0.65, 0.90), 2), "emoji": "😰"},
-    ]
-
-    return random.choice(sentiments)
-
-```
-
-### providers/rag_provider.py
-``` python
-# =============================================================================
-# providers/rag_provider.py — Recuperação de contexto (RAG simplificado)
+# -----------------------------------------------------------------------------
+# INSTALAÇÃO — rode esses comandos no terminal antes de executar:
 #
-# Responsabilidade: receber o texto bruto e retornar os trechos mais
-# relevantes para alimentar o modelo LLM.
+#   pip install requests beautifulsoup4 textblob nltk scikit-learn matplotlib pandas
 #
-# O que é RAG? (Retrieval-Augmented Generation)
-#   Em vez de mandar TODO o texto para o modelo (o que pode ser longo e caro),
-#   o RAG seleciona apenas os trechos mais relevantes. Na vida real usaríamos
-#   embeddings + banco vetorial (ex: FAISS, Chroma). Aqui usamos uma versão
-#   simplificada apenas para demonstrar o conceito na pipeline. 
-# =============================================================================
- 
-def run_rag(text: str) -> str:
-    """
-    Versão simplificada de RAG: seleciona os primeiros N trechos do texto.
-
-    Em uma implementação real, este provider:
-      1. Dividiria o texto em chunks de tamanho fixo
-      2. Geraria embeddings para cada chunk (ex: sentence-transformers)
-      3. Armazenaria em um banco vetorial (FAISS, Chroma, Pinecone...)
-      4. Buscaria os chunks mais similares à query do usuário
-
-    Para este projeto educacional, simulamos o passo de "seleção de contexto"
-    pegando as primeiras 10 sentenças — que geralmente contêm o lide da notícia.
-
-    Args:
-        text (str): Texto bruto extraído pelo scraper
-
-    Returns:
-        str: Contexto reduzido a ser enviado ao modelo LLM
-    """
-
-    if not text:
-        return ""
-
-    # Divide por ponto final e pega as 10 primeiras sentenças
-    # Isso simula a "recuperação" dos trechos mais relevantes
-    chunks = [chunk.strip() for chunk in text.split(".") if chunk.strip()]
-    selected_chunks = chunks[:10]
-
-    # Reconstrói o contexto como texto único
-    context = ". ".join(selected_chunks) + "."
-
-    return context
-
-```
-
-### providers/scraper_provider.py
-``` python
-# =============================================================================
-# providers/scraper_provider.py — Extração de texto de páginas web
+# -----------------------------------------------------------------------------
 #
-# Responsabilidade: fazer o scraping de uma URL e retornar o texto limpo.
-# Esta camada ISOLA a dependência de requests + BeautifulSoup do restante
-# da aplicação. Se trocar a lib de scraping, só este arquivo muda.
+# Como executar:
+#   python scraper_nlp_provider.py
+#
+# Como importar no pipeline:
+#   from providers.scraper_nlp_provider import get_df_final, get_analise
 # =============================================================================
 
 import requests
-from bs4 import BeautifulSoup 
- 
-def scrape_news(url: str) -> str:
-    """
-    Faz o download e parsing de uma página de notícia.
+import pandas as pd
+import re
+import os
+import matplotlib
+import matplotlib.pyplot as plt
+import nltk
 
-    Fluxo:
-      1. requests.get() → baixa o HTML da URL
-      2. BeautifulSoup → faz o parse do HTML
-      3. soup.find_all("p") → extrai somente as tags <p> (parágrafos)
-      4. Junta tudo em uma única string de texto limpo
+from bs4 import BeautifulSoup
+from textblob import TextBlob
+from nltk.corpus import stopwords
+from nltk.tokenize import sent_tokenize
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+# from IPython.display import display, Markdown
+# IPython.display é exclusivo do ambiente Jupyter/Colab.
+# No VS Code usamos print() para texto e retornamos figuras do matplotlib
+# para que o Streamlit possa renderizá-las com st.pyplot().
+
+# Matplotlib em modo não-interativo: evita que plt.show() abra janela
+# separada ao rodar via Streamlit (o Streamlit renderiza a figura via st.pyplot).
+# No terminal standalone, show() continua funcionando normalmente.
+matplotlib.use('Agg')  # sem isso, plt.show() trava em alguns ambientes sem display
+
+# Download de recursos essenciais do NLTK (execução local)
+# quiet=True suprime a saída verbosa — os arquivos ficam em ~/nltk_data
+nltk.download('punkt',     quiet=True)
+nltk.download('stopwords', quiet=True)
+nltk.download('punkt_tab', quiet=True)
+
+print("✅ Ambiente configurado com sucesso (Modo Offline).")
+
+
+# =============================================================================
+# Variáveis de módulo — preenchidas após run_pipeline()
+# Ficam expostas para importação pelo news_pipeline.py
+# =============================================================================
+df_final_global = None   # DataFrame limpo e estruturado
+analise_global  = None   # Dicionário com resultado da análise NLP
+
+
+# =============================================================================
+# ETAPA 1 — Coleta via Scraping (RPA com requests + BeautifulSoup)
+# =============================================================================
+
+def coleta(urls: list) -> pd.DataFrame:
+    """
+    Faz scraping das URLs informadas e extrai o conteúdo textual relevante.
 
     Args:
-        url (str): URL completa da notícia (ex: "https://g1.globo.com/...")
+        urls (list): Lista de URLs a coletar.
 
     Returns:
-        str: Texto completo extraído dos parágrafos da página.
-             Retorna string vazia em caso de erro.
+        pd.DataFrame: Colunas ["url", "texto_bruto"] com o conteúdo coletado.
     """
+    dataset_bruto = []
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
 
-    try:
-        # Faz a requisição HTTP com timeout de 10 segundos
-        response = requests.get(url, timeout=10)
+    for url in urls:
+        try:
+            print(f"🔍 [RPA] Coletando: {url}")
+            res = requests.get(url, headers=headers, timeout=15)
+            res.raise_for_status()
+            soup = BeautifulSoup(res.text, 'html.parser')
 
-        # Lança exceção se o status HTTP for 4xx ou 5xx
-        response.raise_for_status()
+            # Extrai parágrafos e títulos significativos
+            fragments = [tag.text.strip() for tag in soup.find_all(['p', 'h1', 'h2'])]
+            content   = " ".join([f for f in fragments if len(f) > 30])
 
-        # Parse do HTML com o parser padrão do Python
-        soup = BeautifulSoup(response.text, "html.parser")
+            if len(content) > 100:
+                dataset_bruto.append({"url": url, "texto_bruto": content})
 
-        # Extrai texto de todas as tags <p> (parágrafos)
-        # Essa heurística funciona bem para a maioria dos portais de notícia
-        paragraphs = soup.find_all("p")
-        text = " ".join([p.get_text() for p in paragraphs])
+        except Exception as e:
+            print(f"❌ [Erro] Falha em {url}: {e}")
 
-        return text
+    return pd.DataFrame(dataset_bruto)
 
-    except requests.exceptions.RequestException as e: 
-        return ""
+
+# =============================================================================
+# ETAPA 2 — Preparação e Limpeza do Texto
+# =============================================================================
+
+def preparacao(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normaliza o texto bruto, remove duplicatas e exporta CSV estruturado.
+
+    Args:
+        df (pd.DataFrame): DataFrame com coluna "texto_bruto".
+
+    Returns:
+        pd.DataFrame: DataFrame com coluna "texto_limpo" adicionada.
+    """
+    if df.empty:
+        return df
+
+    print("🧹 [Processamento] Normalizando dados...")
+
+    def limpar_texto(texto):
+        texto = texto.lower()
+        texto = re.sub(r'[^a-zá-ú0-9\s\.]', '', texto)  # Mantém letras, números e pontos
+        return re.sub(r'\s+', ' ', texto).strip()
+
+    df['texto_limpo'] = df['texto_bruto'].apply(limpar_texto)
+    df = df.drop_duplicates(subset=['texto_limpo'])
+    df = df[df['texto_limpo'].str.len() > 150]
+
+    df.to_csv("dataset_estruturado.csv", index=False)
+    return df
+
+
+# =============================================================================
+# ETAPA 3 — Análise NLP Local (Sentimento + TF-IDF + Sumarização)
+# =============================================================================
+
+def analise_local(df: pd.DataFrame) -> dict:
+    """
+    Executa análise NLP completa sobre o DataFrame limpo:
+      1. Sentimento via TextBlob (polaridade léxica)
+      2. Extração de temas via TF-IDF
+      3. Sumarização extrativa simples
+
+    Args:
+        df (pd.DataFrame): DataFrame com coluna "texto_limpo".
+
+    Returns:
+        dict: Resultado completo da análise com as chaves:
+              overall_sentiment, polarity_val, themes, summary, distribution
+    """
+    print("⚙️ [NLP Local] Iniciando processamento estatístico...")
+
+    texto_completo = " ".join(df['texto_limpo'].tolist())
+
+    # 1. Análise de Sentimento (Polaridade)
+    # Nota: TextBlob em PT-BR funciona melhor com tradução ou léxicos simples.
+    # Aqui usamos polaridade média dos documentos.
+    sentiment_scores = [TextBlob(txt).sentiment.polarity for txt in df['texto_limpo']]
+    avg_polarity     = sum(sentiment_scores) / len(sentiment_scores)
+
+    overall = (
+        "Positivo" if avg_polarity >  0.05 else
+        "Negativo" if avg_polarity < -0.05 else
+        "Neutro"
+    )
+
+    # 2. Extração de Temas (TF-IDF)
+    vectorizer  = TfidfVectorizer(max_features=10, stop_words=stopwords.words('portuguese'))
+    tfidf_matrix = vectorizer.fit_transform(df['texto_limpo'])
+    temas       = vectorizer.get_feature_names_out()
+
+    # 3. Sumarização Extrativa Simples
+    sentencas = sent_tokenize(texto_completo)
+    resumo    = " ".join(sentencas[:3]) + "..."  # Pega as premissas iniciais dos textos
+
+    return {
+        "overall_sentiment": overall,
+        "polarity_val":      avg_polarity,
+        "themes":            list(temas),
+        "summary":           resumo,
+        "distribution": {
+            "positive": len([s for s in sentiment_scores if s >  0.05]) / len(sentiment_scores) * 100,
+            "neutral":  len([s for s in sentiment_scores if -0.05 <= s <= 0.05]) / len(sentiment_scores) * 100,
+            "negative": len([s for s in sentiment_scores if s < -0.05]) / len(sentiment_scores) * 100,
+        }
+    }
+
+ 
+
+# =============================================================================
+# PIPELINE PRINCIPAL — run_pipeline()
+# =============================================================================
+
+# URLs padrão — podem ser sobrescritas ao chamar run_pipeline(urls=[...])
+URLS_PADRAO = [
+    "https://www.cnnbrasil.com.br/tecnologia/",
+    "https://g1.globo.com/tecnologia/"
+]
+
+def run_pipeline(urls: list = None) -> tuple:
+    """
+    Executa o pipeline completo de coleta e análise NLP.
+
+    Args:
+        urls (list): Lista de URLs para coletar. Se None, usa URLS_PADRAO.
+
+    Returns:
+        tuple: (df_final, resultado_analise)
+               df_final        → pd.DataFrame com texto limpo estruturado
+               resultado_analise → dict com sentimento, temas e sumarização
+    """
+    global df_final_global, analise_global
+
+    urls = urls or URLS_PADRAO
+
+    # ── Etapa 1: Coleta ───────────────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("📡 ETAPA 1 — Coleta via Scraping")
+    print("=" * 60)
+    df_bruto = coleta(urls)
+
+    # ── Etapa 2: Preparação ───────────────────────────────────────────────────
+    print("\n" + "=" * 60)
+    print("🧹 ETAPA 2 — Limpeza e Preparação")
+    print("=" * 60)
+    df_final_global = preparacao(df_bruto)
+
+    # ── Etapa 3: Análise NLP ──────────────────────────────────────────────────
+    if not df_final_global.empty:
+        print("\n" + "=" * 60)
+        print("🤖 ETAPA 3 — Análise NLP Local")
+        print("=" * 60)
+        analise_global = analise_local(df_final_global)
+    else:
+        print("❌ Nenhum dado coletado para análise.")
+        analise_global = {}
+
+    return df_final_global, analise_global
+
+
+# =============================================================================
+# Funções auxiliares — interface para o news_pipeline.py
+# =============================================================================
+
+def get_df_final(urls: list = None) -> pd.DataFrame:
+    """
+    Retorna df_final_global, executando run_pipeline() se ainda não foi rodado.
+    Usada pelo news_pipeline.py para acessar o dataset estruturado.
+    """
+    global df_final_global
+    if df_final_global is None or df_final_global.empty:
+        print("📡 Dataset não encontrado em memória — iniciando pipeline...")
+        run_pipeline(urls=urls)
+    return df_final_global
+
+
+def get_analise(urls: list = None) -> dict:
+    """
+    Retorna o dicionário de análise NLP, executando run_pipeline() se necessário.
+    Usada pelo news_pipeline.py para obter sentimento, temas e sumarização.
+    """
+    global analise_global
+    if analise_global is None:
+        run_pipeline(urls=urls)
+    return analise_global
+
+
+# =============================================================================
+# Ponto de entrada
+# ALTERADO: o código de execução ficava solto no nível do módulo, o que
+# causava execução automática ao fazer `import` em outros arquivos.
+# Protegido com __main__: só executa quando chamado diretamente pelo terminal.
+# =============================================================================
+if __name__ == "__main__":
+    print("🚀 Executando pipeline completo...")
+    df, resultado = run_pipeline()
+    print(f"\n🏁 Pipeline finalizado. {len(df)} documentos processados.")
 
 ```
 
 ### pipelines/news_pipeline.py
 ``` python
 # =============================================================================
-# pipelines/news_pipeline.py — Orquestração do fluxo de análise
-#
-# Responsabilidade: conectar os providers em sequência, formando a pipeline
-# completa de processamento de uma notícia.
-#
-# Este arquivo NÃO conhece Streamlit — é Python puro. Isso facilita testes
-# unitários e reaproveitamento da lógica fora do contexto da UI.
-#
-# Fluxo:
-#   URL → [Scraper] → texto bruto
-#              ↓
-#           [RAG] → contexto reduzido
-#              ↓
-#    [LLM: resumo + sentimento] → resultado final
+# ARQUIVO: pipelines/news_pipeline.py
+# =============================================================================
+# Responsabilidade: Orquestrar o fluxo de processamento de dados (ETL).
+# ETL significa: Extract (Extrair), Transform (Transformar) e Load (Carregar).
+# Este arquivo conecta as funções de baixo nível do provedor de NLP com 
+# a interface visual do Streamlit.
 # =============================================================================
 
-from providers.scraper_provider import scrape_news
-from providers.rag_provider import run_rag
-from providers.llm_provider import summarize_text, analyze_sentiment
+# Importamos as funções especializadas do nosso "Provedor" de inteligência artificial.
+# etapa_1: Busca a notícia na web.
+# etapa_2: Limpa o texto (remove HTML, anúncios, etc).
+# etapa_analise_local: Aplica os modelos de IA para resumo e sentimento.
+from providers.scraper_nlp_provider import (
+    coleta, 
+    preparacao, 
+    analise_local
+)
 
-
-def analyze_news(url: str, model: str) -> dict:
+def analyze_news(url: str):
     """
-    Executa a pipeline completa de análise de uma notícia.
-
-    Args:
-        url   (str): URL da notícia a ser analisada
-        model (str): Modelo LLM selecionado pelo usuário
-
-    Returns:
-        dict com as chaves:
-            - "article"   (str):  Texto bruto extraído da página
-            - "context"   (str):  Contexto selecionado pelo RAG
-            - "summary"   (str):  Resumo gerado pelo LLM
-            - "sentiment" (dict): Resultado da análise de sentimento
-                                  {"label": str, "score": float, "emoji": str}
+    Função principal que orquestra o fluxo de dados. 
+    Recebe uma URL (string) e retorna um dicionário estruturado ou None.
     """
+    
+    # -------------------------------------------------------------------------
+    # 1. COLETA (EXTRAÇÃO)
+    # -------------------------------------------------------------------------
+    # Enviamos a URL dentro de uma lista [url] para a função de coleta.
+    # df_bruto é um DataFrame do Pandas contendo o que foi baixado do site.
+    df_bruto = coleta([url])
+    
+    # Validação de segurança: Se a coleta falhou (URL inválida ou site bloqueado),
+    # interrompemos o processo aqui para evitar erros no código seguinte.
+    if df_bruto.empty:
+        return None
 
-    # Passo 1: Scraping — faz download e extrai texto da página
-    article = scrape_news(url)
+    # -------------------------------------------------------------------------
+    # 2. LIMPEZA E PREPARAÇÃO (TRANSFORMAÇÃO)
+    # -------------------------------------------------------------------------
+    # O texto bruto de um site vem com "sujeira". Esta etapa isola apenas 
+    # o corpo do texto da notícia, tratando pontuação e caracteres especiais.
+    df_final = preparacao(df_bruto)
 
-    # Passo 2: RAG — seleciona os trechos mais relevantes do texto
-    context = run_rag(article)
-
-    # Passo 3a: LLM → gera o resumo da notícia
-    summary = summarize_text(context, model)
-
-    # Passo 3b: NLP → analisa o sentimento do texto
-    sentiment = analyze_sentiment(context)
-
-    return {
-        "article":   article,
-        "context":   context,
-        "summary":   summary,
-        "sentiment": sentiment,
-    }
+    # -------------------------------------------------------------------------
+    # 3. ANÁLISE (IA E PROCESSAMENTO)
+    # -------------------------------------------------------------------------
+    if not df_final.empty:
+        # Aqui a mágica acontece: o modelo de NLP lê o texto limpo e gera:
+        # - Um resumo automático.
+        # - A polaridade (positivo/negativo).
+        # - A distribuição de confiança dos sentimentos.
+        resultado_analise = analise_local(df_final)
+        
+        # ---------------------------------------------------------------------
+        # 4. FORMATAÇÃO DO CONTRATO (RETORNO)
+        # ---------------------------------------------------------------------
+        # Não retornamos o DataFrame bruto para a UI.
+        # Criamos um "Dicionário de Resposta" limpo. Isso separa a lógica de dados
+        # da lógica de visualização. Se mudarmos a IA no futuro, a UI nem percebe.
+        return {
+            "article": df_final.iloc[0]['texto_bruto'],  # Texto original completo
+            "summary": resultado_analise['summary'],      # Resumo gerado pela IA
+            "sentiment": {
+                "label": resultado_analise['overall_sentiment'], # Ex: "Positivo"
+                "score": resultado_analise['polarity_val'],      # Valor numérico da análise
+                "distribution": resultado_analise['distribution'], # Dados para gerar gráficos
+                # Lógica visual simples: escolhe o emoji baseado no texto do sentimento
+                "emoji": "😊" if resultado_analise['overall_sentiment'] == "Positivo" else "😐"
+            }
+        }
+    
+    # Se algo falhou no meio do caminho, retornamos Nada (None)
+    return None
 ```
 
 ### features/history/page.py
@@ -1003,6 +1144,8 @@ def analyze_news(url: str, model: str) -> dict:
 import streamlit as st
 import pandas as pd
 
+from ui.charts import render_sentiment_chart
+
 
 def render():
     """
@@ -1016,7 +1159,7 @@ def render():
       [Visualização de análise individual selecionada]
     """
 
-    st.title("📋 Histórico de Análises")
+    st.title("Histórico de Análises")
     st.markdown("Consulte todas as notícias analisadas nesta sessão.")
     st.markdown("---")
 
@@ -1082,8 +1225,27 @@ def render():
 
         st.bar_chart(sentiment_counts)
 
-    st.markdown("---")
+        st.markdown("---")
 
+        # 2. IMPLEMENTAÇÃO DO GRÁFICO
+        st.markdown("---")
+        st.subheader("Gráfico de Distribuição")
+            
+        # Chamamos a função da UI passando os dados do session_state
+        # Contamos as ocorrências no DataFrame
+        counts = df["sentimento"].value_counts().to_dict()
+    
+        # Mapeamos para o formato que a função da UI espera
+        # (Ajuste as chaves para baterem com o que o provider usa: 'positive', etc)
+        dist_global = {
+            "positive": counts.get("Positivo", 0),
+            "neutral": counts.get("Neutro", 0),
+            "negative": counts.get("Negativo", 0)
+        }
+
+        if any(dist_global.values()):
+            render_sentiment_chart(dist_global)
+ 
     # ------------------------------------------------------------------
     # Seletor para visualizar uma análise específica do histórico
     # ------------------------------------------------------------------
@@ -1123,7 +1285,7 @@ def render():
 # =============================================================================
 
 import streamlit as st 
-from pipelines.news_pipeline import analyze_news
+from pipelines.news_pipeline import analyze_news 
 
 
 def render():
@@ -1150,7 +1312,7 @@ def render():
     url = st.text_input(
         "URL da notícia",
         placeholder="https://g1.globo.com/...",
-        key="url_input"    # chave no session_state — lida pelo controller
+        key="url_input"    # chave no session_state
     )
 
     # on_click= passa a função sem chamá-la; o Streamlit chama ao clicar
@@ -1206,16 +1368,17 @@ def render():
             with col_score:
                 st.metric(
                     label="Confiança do modelo",
-                    value=f"{sentiment['score'] * 100:.0f}%"
+                    value=f"{abs(sentiment['score']) * 100:.0f}%"
                 )
 
             # Barra de progresso visual para o score de confiança
-            st.progress(sentiment["score"])
+            st.progress(abs(sentiment["score"]))
 
             st.caption(
                 "ℹ️ A análise de sentimento indica o tom predominante da notícia "
                 "com base no conteúdo textual extraído."
             )
+ 
         else:
             st.info("Sentimento não disponível para esta análise.")
 
@@ -1283,10 +1446,7 @@ def _save_feedback(feedback_type: str):
         "feedback":  feedback_type,
     })
 
-@st.cache_data(ttl=3600)
-def get_analysis_result(url, model):
-    return analyze_news(url=url, model=model)
-  
+ 
 def run_analysis():
     """
     Callback chamado quando o usuário clica em "Executar análise".
@@ -1302,23 +1462,20 @@ def run_analysis():
     """
 
     url = st.session_state.get("url_input", "").strip()
-
-    # Validação básica: não executa com URL vazia
     if not url:
-        st.warning("Por favor, insira uma URL válida antes de analisar.")
+        st.warning("Insira uma URL.")
         return
 
-    # Executa a pipeline completa (scraping → RAG → LLM → sentimento) 
-    result = get_analysis_result(
-        url=url,
-        model=st.session_state.model
-    )
+    # Chama o pipeline (que agora está em /pipelines)
+    result = analyze_news(url=url)
 
-    # Persiste os resultados no estado da sessão para a page.py renderizar
-    st.session_state.article_text = result["article"]
-    st.session_state.summary      = result["summary"]
-    st.session_state.sentiment    = result["sentiment"]
-    st.session_state.current_url  = url
+    if result:
+        st.session_state.article_text = result["article"]
+        st.session_state.summary      = result["summary"]
+        st.session_state.sentiment    = result["sentiment"]
+        st.session_state.current_url  = url
+    else:
+        st.error("Não foi possível analisar esta URL.")
 
 
 ```
