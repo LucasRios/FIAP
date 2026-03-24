@@ -11,10 +11,10 @@
 # etapa_1: Busca a notícia na web.
 # etapa_2: Limpa o texto (remove HTML, anúncios, etc).
 # etapa_analise_local: Aplica os modelos de IA para resumo e sentimento.
-from providers.NLP_Sentimentos_Resumo_Analitico import (
-    etapa_1_coleta, 
-    etapa_2_preparacao, 
-    etapa_analise_local
+from providers.scraper_nlp_provider import (
+    coleta, 
+    preparacao, 
+    analise_local
 )
 
 def analyze_news(url: str):
@@ -28,7 +28,7 @@ def analyze_news(url: str):
     # -------------------------------------------------------------------------
     # Enviamos a URL dentro de uma lista [url] para a função de coleta.
     # df_bruto é um DataFrame do Pandas contendo o que foi baixado do site.
-    df_bruto = etapa_1_coleta([url])
+    df_bruto = coleta([url])
     
     # Validação de segurança: Se a coleta falhou (URL inválida ou site bloqueado),
     # interrompemos o processo aqui para evitar erros no código seguinte.
@@ -40,7 +40,7 @@ def analyze_news(url: str):
     # -------------------------------------------------------------------------
     # O texto bruto de um site vem com "sujeira". Esta etapa isola apenas 
     # o corpo do texto da notícia, tratando pontuação e caracteres especiais.
-    df_final = etapa_2_preparacao(df_bruto)
+    df_final = preparacao(df_bruto)
 
     # -------------------------------------------------------------------------
     # 3. ANÁLISE (IA E PROCESSAMENTO)
@@ -50,7 +50,7 @@ def analyze_news(url: str):
         # - Um resumo automático.
         # - A polaridade (positivo/negativo).
         # - A distribuição de confiança dos sentimentos.
-        resultado_analise = etapa_analise_local(df_final)
+        resultado_analise = analise_local(df_final)
         
         # ---------------------------------------------------------------------
         # 4. FORMATAÇÃO DO CONTRATO (RETORNO)
