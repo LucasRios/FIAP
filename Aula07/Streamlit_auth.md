@@ -51,7 +51,7 @@ O conceito aplicado aqui é o de RBAC (Role-Based Access Control). Em vez de con
 
 No exemplo da aula, temos dois perfis:
 
-- `user` → acesso básico  
+- `aluno` → acesso básico  
 - `admin` → acesso completo  
 
 Esse modelo é amplamente utilizado em sistemas reais porque simplifica a gestão de permissões. Em vez de configurar acesso individual, basta definir regras por perfil.
@@ -62,60 +62,92 @@ No código, isso aparece de forma simples, mas poderosa: o menu lateral é const
 
 ## Implementação
 
-### Provider de autenticação
+### providers/auth_provider.py
 
 O `provider` centraliza a lógica de validação. Isso é importante porque evita espalhar regras de negócio pela interface.
 
 ```python
-import streamlit as st
-
-def login(username, password):
-    # Simulação de base de dados (Em produção, aqui seria uma consulta ao banco ou API)
+def authenticate_user(username, password):
     users = {
         "admin": {"password": "123", "role": "admin"},
         "aluno": {"password": "456", "role": "user"}
     }
 
     if username in users and users[username]["password"] == password:
-        return users[username]["role"]
-    return None
+        return users[username]
 
-def logout():
-    for key in st.session_state.keys():
-        del st.session_state[key]
-    st.rerun()
+    return None
 ```
 
 Aqui estamos simulando um banco de dados com um dicionário. O ponto relevante não é a implementação em si, mas a separação de responsabilidade. Em um cenário real, essa função poderia facilmente ser substituída por uma chamada a API ou banco sem impactar o restante da aplicação.
 
 ---
 
-### Interface de login
-
-A interface é responsável apenas por capturar os dados do usuário e reagir ao resultado da autenticação.
-
+### pipelines/auth_pipeline.py
+Aqui entra a validação de regra, não só verificação de senha.
 ```python
-import streamlit as st
-from provider.auth_provider import login
 
-def show_login():
-    st.subheader("Acesso ao Sistema de IA")
+from providers.auth_provider import authenticate_user
+
+def login_user(username: str, password: str):
+    """
+    Pipeline de autenticação com validações de negócio.
+    """
+
+    # 1. Validação básica
+    if not username or not password:
+        return {"success": False, "error": "Credenciais inválidas"}
+
+    # 2. Provider (fonte de verdade)
+    user_data = authenticate_user(username, password)
+
+    if not user_data:
+        return {"success": False, "error": "Usuário ou senha incorretos"}
+
+    # 3. Regra de negócio (exemplo)
+    if user_data.get("blocked"):
+        return {"success": False, "error": "Usuário bloqueado"}
+
+    return {
+        "success": True,
+        "username": username,
+        "role": user_data["role"]
+    }
+
+
+def logout_user():
+    """
+    Pipeline de logout (pode evoluir para logs, auditoria, etc)
+    """
+    return {"success": True}
+
+```
+---
+
+### ui/login_ui.py
+```python
+
+import streamlit as st
+from pipelines.auth_pipeline import login_user
+
+def render_login():
+    st.title("Login")
 
     with st.form("login_form"):
         user = st.text_input("Usuário")
         pw = st.text_input("Senha", type="password")
-        submit = st.form_submit_button("Entrar")
 
-        if submit:
-            role = login(user, pw)
-            if role:
+        if st.form_submit_button("Entrar"):
+            result = login_user(user, pw)
+
+            if result["success"]:
                 st.session_state.logged_in = True
-                st.session_state.user_role = role
-                st.session_state.username = user
-                st.success("Login realizado!")
+                st.session_state.username = result["username"]
+                st.session_state.role = result["role"]
                 st.rerun()
             else:
-                st.error("Usuário ou senha incorretos")
+                st.error(result["error"])
+
 ```
 
 O uso de `st.form` evita reexecuções desnecessárias enquanto o usuário digita. A validação só acontece no momento do submit, o que deixa o fluxo mais previsível.
@@ -124,66 +156,112 @@ Quando o login é bem-sucedido, os dados são armazenados no `session_state`, e 
 
 ---
 
+### state/session.py
+
+```python
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "role" not in st.session_state:
+    st.session_state.role = None
+
+if "username" not in st.session_state:
+    st.session_state.username = None
+
+```
+---
+ 
+### ui/sidebar.py
+```python
+
+import streamlit as st
+
+def render_sidebar():
+    st.sidebar.title(f"🚀 FIAP AI News")
+
+    if st.session_state.logged_in:
+        st.sidebar.write(f"Olá, {st.session_state.username}")
+        st.sidebar.markdown("---")
+
+        role = st.session_state.role
+
+        # Sempre disponível
+        if st.sidebar.button("Analisar Notícia"):
+            st.session_state.page = "analysis"
+
+        # Apenas admin
+        if role == "admin":
+            if st.sidebar.button("Histórico"):
+                st.session_state.page = "history"
+
+            if st.sidebar.button("Configurações"):
+                st.session_state.page = "settings"
+
+        st.sidebar.markdown("---")
+
+        if st.sidebar.button("Logout"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+
+    return st.session_state.page       
+
+```
+---
 ### Orquestração e roteamento
 
 O `app.py` continua sendo o ponto central da aplicação. Ele não implementa regras de negócio nem UI detalhada — apenas decide o fluxo.
 
 ```python
 import streamlit as st
-from ui.login_ui import show_login
-from provider.auth_provider import logout
+import ui.sidebar as sidebar
+import state.session as session
+import features.settings.page as settings_page
+import features.news_analysis.page as analysis_page
+import features.history.page as history_page
+import features.login.page as login_page
 
-# 1. Configuração da Página
-st.set_page_config(page_title="FIAP - IA Platform", layout="wide")
+st.set_page_config(page_title="AI news analyzer", page_icon=":sparkles:", layout="wide")
 
-# 2. Inicialização do Estado de Sessão
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
+#inicializar as variaveis de sessão
+session.init_session()
 
-def main():
-    # Roteamento Principal
-    if not st.session_state.logged_in:
-        show_login()
-    else:
-        render_app()
+if not st.session_state.logged_in:
+    login_page.render()
+    st.stop()
 
-def render_app():
-    # Sidebar Customizada por Perfil
-    st.sidebar.title(f"Olá, {st.session_state.username}")
-    role = st.session_state.user_role
+#inicializar o sidebar
+current_page = sidebar.render_sidebar()
 
-    # Menu Comum
-    menu = ["Home", "Análise de Dados"]
+#roteamento das páginas
+if current_page == 'analysis':
+    analysis_page.render()
+elif current_page == 'history':
+    history_page.render()
+elif current_page == 'settings':
+    settings_page.render()
 
-    # Menu Restrito (RBAC)
-    if role == "admin":
-        menu.append("Gestão de Modelos")
-        menu.append("Logs do Sistema")
-
-    choice = st.sidebar.selectbox("Navegação", menu)
-
-    if st.sidebar.button("Sair"):
-        logout()
-
-    # Renderização das Telas
-    st.title(f"Área: {choice}")
-
-    if choice == "Home":
-        st.write("Bem-vindo ao portal de inteligência artificial.")
-
-    elif choice == "Análise de Dados":
-        st.info("Tela visível para todos os usuários logados.")
-
-    elif choice == "Gestão de Modelos":
-        st.warning("Atenção: Esta tela é exclusiva para ADMINISTRADORES.")
-        st.write("Configurações de Hiperparâmetros e Retreinamento.")
-
-if __name__ == "__main__":
-    main()
 ```
 
 O fluxo aqui é direto: se não está logado, mostra login. Se está, renderiza a aplicação. A função `render_app` constrói a interface com base no perfil, garantindo que o usuário veja apenas o que pode acessar.
 
+---
+### Bloqueio REAL
+
+Só esconder menu não é segurança.
+
+Você precisa proteger também no nível da página:
+
+Exemplo: history/page.py
+
+```python
+
+if st.session_state.role != "admin":
+    st.error("Acesso negado")
+    st.stop()
+
+```
 ---
 
 ## O que realmente está acontecendo
