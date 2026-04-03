@@ -124,13 +124,13 @@ def logout_user():
 ```
 ---
 
-### ui/login_ui.py
+### features/login/page.py
 ```python
 
 import streamlit as st
 from pipelines.auth_pipeline import login_user
 
-def render_login():
+def render():
     st.title("Login")
 
     with st.form("login_form"):
