@@ -1,6 +1,6 @@
 # Autenticação, Estado e Navegação por Perfil no Streamlit
 
-# Até aqui, a aplicação construída funciona bem como protótipo. No entanto, ainda não resolve um problema essencial de qualquer sistema real: controle de acesso. Nesta aula, a proposta é evoluir a aplicação para um cenário mais próximo de produto, introduzindo autenticação, persistência de sessão e navegação baseada no perfil do usuário.
+Até aqui, a aplicação construída funciona bem como protótipo. No entanto, ainda não resolve um problema essencial de qualquer sistema real: controle de acesso. Nesta aula, a proposta é evoluir a aplicação para um cenário mais próximo de produto, introduzindo autenticação, persistência de sessão e navegação baseada no perfil do usuário.
 
 A ideia central é simples: diferentes usuários devem enxergar diferentes partes do sistema. Para isso, vamos implementar um fluxo completo de login e, a partir dele, controlar o que é exibido na interface.
 
