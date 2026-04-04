@@ -170,6 +170,9 @@ Isso elimina uma camada inteira de backend.
 ---
 
 ## 4. UX para IA: O Componente "Examples"
+O componente gr.Examples melhora significativamente a experiência do usuário ao eliminar o problema da “tela em branco”. Em aplicações de IA, muitas vezes o usuário não sabe o que inserir ou como testar o modelo. Os exemplos funcionam como atalhos interativos: ao clicar em um deles, os campos de entrada são automaticamente preenchidos e, opcionalmente, a execução pode ser disparada.
+
+Além de guiar o uso, os exemplos também servem como validação rápida (smoke test), permitindo verificar se o modelo continua respondendo corretamente para casos conhecidos. Na prática, eles reduzem fricção, aumentam engajamento e tornam a demo mais autoexplicativa, especialmente em apresentações para stakeholders ou usuários não técnicos.
 
 ```python
 gr.Examples(
