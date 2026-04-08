@@ -1,6 +1,6 @@
 # Aula 09 — UX para IA, Latência e Streaming com Gradio
 
-> **Objetivo:** Traduzir os princípios de Design System para IA (vistos na Aula 02 com Streamlit) para o universo dos modelos generativos, usando Gradio como plataforma. O aluno sairá desta aula capaz de construir interfaces que comunicam incerteza, exibem o processo de geração em tempo real e coletam feedback humano de forma estruturada.
+> **Objetivo:** Traduzir os princípios de Design System para IA (vistos na Aula 02 com Streamlit) para o universo dos modelos generativos, usando Gradio como plataforma. Construir interfaces que comunicam incerteza, exibem o processo de geração em tempo real e coletam feedback humano de forma estruturada.
 
 ---
 
@@ -734,8 +734,6 @@ demo.launch()
 ---
 
 ## 8. Checklist do App de IA com Gradio
-
-Antes de apresentar seu app para stakeholders, verifique:
 
 - Os scores de confiança estão visíveis e interpretáveis?
 - O usuário consegue distinguir visualmente alta, média e baixa confiança?
