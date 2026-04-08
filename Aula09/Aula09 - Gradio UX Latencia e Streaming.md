@@ -347,22 +347,414 @@ Agora vamos unir os três conceitos em um único app: um chatbot que faz streami
 
 Este é o padrão de interface mais comum em produtos de IA generativa modernos.
 
+app.py
+
 ```python
+# =============================================================================
+# app.py — Ponto de entrada e orquestrador da aplicação
+#
+# Responsabilidade: inicializar e lançar o app.
+# Este arquivo deve ser o mais fino possível — apenas importa a feature
+# e chama .launch(). Ele não contém UI nem lógica de negócio.
+#
+# Para rodar:
+#   pip install gradio
+#   python app.py
+# =============================================================================
+
+from features.chatbot.page import criar_interface
+
+if __name__ == "__main__":
+    app = criar_interface()
+    app.launch()
+
+```
+
+features/chatbot/page.py
+
+```python
+# =============================================================================
+# features/chatbot/page.py — Interface do chatbot
+#
+# Responsabilidade: APENAS UI.
+# Esta camada coleta input, chama o pipeline e exibe resultados.
+# Ela não sabe nada sobre modelos, APIs ou onde o feedback é salvo.
+#
+# Regra: se você encontrar lógica de negócio aqui, ela pertence ao pipeline.
+# =============================================================================
+
 import gradio as gr
+
+import pipelines.chat_pipeline as pipeline
+
+
+def criar_interface() -> gr.Blocks:
+    """
+    Constrói e retorna o objeto gr.Blocks com toda a interface do chatbot.
+
+    Retorna o app sem chamá-lo — quem faz o .launch() é o app.py.
+    Isso permite que o mesmo componente seja montado em diferentes contextos
+    (desenvolvimento local, testes, embed em app maior).
+    """
+
+    with gr.Blocks(title="AI Chatbot com Streaming e Feedback", theme=gr.themes.Soft()) as app:
+
+        # ── Estado interno ──────────────────────────────────────────────────
+        # gr.State é o equivalente ao st.session_state do Streamlit.
+        # Persiste valores entre eventos sem rerun completo.
+        # Usamos dois estados separados porque pergunta e resposta são
+        # capturados em momentos diferentes do fluxo de eventos.
+        estado_ultima_pergunta = gr.State("")
+        estado_ultima_resposta = gr.State("")
+
+        # ── Cabeçalho ───────────────────────────────────────────────────────
+        gr.Markdown("# 🤖 Chatbot com Streaming, Confiança e Feedback Humano")
+        gr.Markdown(
+            "Este app demonstra os quatro pilares de UX para IA vistos na Aula 02, "
+            "agora aplicados a um modelo generativo com Gradio:\n\n"
+            "**Transparência** · **Gestão de Incerteza** · **Design para Latência** · **Human-in-the-loop**"
+        )
+        gr.Markdown("---")
+
+        # ── Layout principal: chat à esquerda, painel à direita ─────────────
+        with gr.Row():
+
+            # ── Coluna esquerda: conversa ───────────────────────────────────
+            with gr.Column(scale=3):
+                gr.Markdown("### 💬 Conversa")
+
+                chatbot = gr.Chatbot(
+                    label="Histórico",
+                    height=400,
+                    show_copy_button=True,
+                    bubble_full_width=False
+                )
+
+                with gr.Row():
+                    input_mensagem = gr.Textbox(
+                        label="",
+                        placeholder="Digite sua mensagem e pressione Enter...",
+                        scale=4,
+                        container=False
+                    )
+                    botao_enviar = gr.Button("Enviar ➤", variant="primary", scale=1)
+
+                botao_limpar = gr.Button("🗑️ Limpar conversa", variant="secondary")
+
+            # ── Coluna direita: confiança + feedback ────────────────────────
+            with gr.Column(scale=2):
+
+                # Pilar: Gestão de Incerteza
+                gr.Markdown("### 📊 Gestão de Incerteza")
+                output_confianca_texto = gr.Textbox(
+                    label="Análise de Confiança",
+                    lines=2,
+                    interactive=False,
+                    value="Aguardando resposta..."
+                )
+                output_nivel = gr.Textbox(
+                    label="Nível",
+                    interactive=False,
+                    value=""
+                )
+
+                gr.Markdown("---")
+
+                # Pilar: Human-in-the-loop
+                gr.Markdown("### 👥 Human-in-the-loop")
+                gr.Markdown(
+                    "Avalie a última resposta. "
+                    "Seu feedback é registrado para retreinamento do modelo."
+                )
+
+                with gr.Row():
+                    botao_like = gr.Button("👍 Resposta correta", variant="secondary")
+                    botao_dislike = gr.Button("👎 Resposta incorreta", variant="secondary")
+
+                output_feedback_status = gr.Textbox(
+                    label="Status do Feedback",
+                    interactive=False,
+                    value=""
+                )
+
+                gr.Markdown("---")
+
+                # Pilar: Transparência — exemplos ajudam o usuário a entender
+                # o espaço de entrada e reduzem o atrito inicial
+                gr.Markdown("### 💡 Exemplos para testar")
+                gr.Examples(
+                    examples=[
+                        ["Explique o conceito de streaming em interfaces de IA"],
+                        ["O que é human-in-the-loop e por que é importante?"],
+                        ["Como funciona o sistema de confiança deste app?"],
+                        ["Oi"],  # pergunta curta → confiança baixa simulada
+                    ],
+                    inputs=input_mensagem,
+                    label=""
+                )
+
+        # ── Conexão de eventos ──────────────────────────────────────────────
+        # Cada evento conecta um componente de UI a uma função do pipeline.
+        # A UI não implementa lógica — apenas orquestra chamadas.
+        #
+        # O encadeamento .then() permite executar ações em sequência após
+        # o streaming terminar: guardar a pergunta no estado, limpar o input.
+
+        def _enviar(mensagem, historico):
+            """Delega inteiramente ao pipeline — a UI não processa nada."""
+            return pipeline.processar_mensagem(mensagem, historico)
+
+        # Evento: clique no botão Enviar
+        botao_enviar.click(
+            fn=_enviar,
+            inputs=[input_mensagem, chatbot],
+            outputs=[chatbot, output_confianca_texto, output_nivel, estado_ultima_resposta],
+        ).then(
+            fn=lambda msg: msg,          # captura a pergunta antes de limpar o input
+            inputs=input_mensagem,
+            outputs=estado_ultima_pergunta
+        ).then(
+            fn=lambda: "",               # limpa o campo de texto após envio
+            outputs=input_mensagem
+        )
+
+        # Evento: Enter no campo de texto (mesmo fluxo do botão)
+        input_mensagem.submit(
+            fn=_enviar,
+            inputs=[input_mensagem, chatbot],
+            outputs=[chatbot, output_confianca_texto, output_nivel, estado_ultima_resposta],
+        ).then(
+            fn=lambda msg: msg,
+            inputs=input_mensagem,
+            outputs=estado_ultima_pergunta
+        ).then(
+            fn=lambda: "",
+            outputs=input_mensagem
+        )
+
+        # Evento: feedback positivo
+        botao_like.click(
+            fn=lambda p, r: pipeline.registrar_feedback(p, r, "positivo"),
+            inputs=[estado_ultima_pergunta, estado_ultima_resposta],
+            outputs=output_feedback_status
+        )
+
+        # Evento: feedback negativo
+        botao_dislike.click(
+            fn=lambda p, r: pipeline.registrar_feedback(p, r, "negativo"),
+            inputs=[estado_ultima_pergunta, estado_ultima_resposta],
+            outputs=output_feedback_status
+        )
+
+        # Evento: limpar conversa — reseta todos os componentes ao estado inicial
+        botao_limpar.click(
+            fn=lambda: ([], "Aguardando resposta...", "", ""),
+            outputs=[chatbot, output_confianca_texto, output_nivel, output_feedback_status]
+        )
+
+    return app
+
+
+```
+
+pipelines/chat_pipeline.py
+
+```python
+# =============================================================================
+# pipelines/chat_pipeline.py — Orquestração do fluxo de chat com streaming
+#
+# Responsabilidade: conectar as chamadas ao modelo com a lógica de streaming
+# e a interpretação de confiança. Este é o único lugar que conhece tanto
+# o provider de modelo quanto o provider de feedback.
+#
+# A UI chama apenas processar_mensagem() e registrar_feedback().
+# Ela não sabe nada sobre como o modelo funciona ou onde o feedback é salvo.
+# =============================================================================
+
 import time
-import random
+
+import providers.modelo_provider as modelo
+import providers.feedback_provider as feedback
+
+
+def _interpretar_confianca(confianca: float) -> tuple[str, str]:
+    """
+    Converte um score numérico em linguagem humana.
+
+    Retorna uma tupla (descricao, nivel) para alimentar dois componentes
+    distintos da interface — texto explicativo e indicador visual.
+    """
+    percentual = int(confianca * 100)
+
+    if confianca >= 0.78:
+        nivel = "🟢 Alta"
+        descricao = f"Confiança: {percentual}% — O modelo tem alta certeza nesta resposta."
+    elif confianca >= 0.55:
+        nivel = "🟡 Média"
+        descricao = f"Confiança: {percentual}% — Recomenda-se verificar informações importantes."
+    else:
+        nivel = "🔴 Baixa"
+        descricao = f"Confiança: {percentual}% — Esta resposta pode conter imprecisões."
+
+    return descricao, nivel
+
+
+def processar_mensagem(pergunta: str, historico: list):
+    """
+    Gerador principal do chatbot — o coração do streaming.
+
+    Este é o único lugar onde o `yield` acontece. A UI não implementa
+    nenhuma lógica de streaming; ela apenas conecta este gerador a um
+    componente gr.Chatbot.
+
+    Fluxo:
+        1. Validar entrada
+        2. Chamar o modelo (provider) → obtém resposta + confiança
+        3. Interpretar confiança em linguagem humana
+        4. Simular geração token a token com yield progressivo
+        5. Yield final com resposta completa para o sistema de feedback
+
+    Yields: (historico_atual, descricao_confianca, nivel, resposta_completa)
+    """
+    if not pergunta.strip():
+        yield historico, "", "", ""
+        return
+
+    resposta_completa, confianca = modelo.chamar_modelo(pergunta, historico)
+    descricao, nivel = _interpretar_confianca(confianca)
+
+    # Inicializar o histórico com a pergunta atual e resposta vazia
+    # O Gradio atualiza o chatbot a cada yield desta lista
+    historico_atual = historico + [[pergunta, ""]]
+
+    # Streaming: acumular caractere a caractere e atualizar o chat
+    # O padrão de acumulação (texto_parcial += c) é intencional:
+    # sempre enviamos o texto COMPLETO até o momento, não apenas o novo fragmento.
+    texto_parcial = ""
+    for caractere in resposta_completa:
+        texto_parcial += caractere
+        historico_atual[-1][1] = texto_parcial
+        yield historico_atual, descricao, nivel, resposta_completa
+        time.sleep(0.015)
+
+    # Yield final garante que a resposta completa chegue ao estado da UI
+    yield historico_atual, descricao, nivel, resposta_completa
+
+
+def registrar_feedback(pergunta: str, resposta: str, tipo: str) -> str:
+    """
+    Salva a avaliação do usuário e retorna uma mensagem de status formatada.
+
+    Parâmetros:
+        tipo: "positivo" ou "negativo"
+
+    Retorna uma string pronta para exibir em um gr.Textbox de status.
+    """
+    feedback.salvar(pergunta, resposta, tipo)
+    dados = feedback.resumo()
+
+    if tipo == "positivo":
+        return (
+            f"✅ Feedback positivo registrado. "
+            f"Total acumulado: {dados['total']} avaliações."
+        )
+    else:
+        return (
+            f"🔴 Feedback negativo registrado. "
+            f"Total: {dados['total']} avaliações "
+            f"({dados['positivos']} positivos, {dados['negativos']} negativos)."
+        )
+
+
+```
+providers/feedback_provider.py
+
+```python
+# =============================================================================
+# providers/feedback_provider.py — Armazenamento de feedback humano
+#
+# Responsabilidade: persistir e recuperar os registros de avaliação do usuário.
+# Em produção: substitua a lista em memória por banco de dados ou API.
+# O pipeline e a UI nunca sabem como o dado é armazenado — apenas chamam
+# as funções públicas deste módulo.
+# =============================================================================
+
 from datetime import datetime
 
 
-# ─────────────────────────────────────────────
-# CAMADA DE LÓGICA (simulando um modelo real)
-# ─────────────────────────────────────────────
+# Armazenamento em memória — escopo do processo (reinicia com o app)
+# Em produção: use SQLite, PostgreSQL, ou uma API de coleta de dados
+_registro: list[dict] = []
+
+
+def salvar(pergunta: str, resposta: str, tipo: str) -> None:
+    """
+    Registra uma avaliação humana com contexto completo.
+
+    Parâmetros:
+        pergunta: mensagem que originou a resposta avaliada
+        resposta: texto completo gerado pelo modelo
+        tipo:     "positivo" ou "negativo"
+    """
+    _registro.append({
+        "timestamp": datetime.now().isoformat(),
+        "pergunta": pergunta,
+        "resposta": resposta,
+        "feedback": tipo,
+    })
+
+
+def resumo() -> dict:
+    """
+    Retorna um resumo agregado do feedback acumulado.
+    Útil para exibir métricas de qualidade na interface.
+
+    Retorna um dicionário com:
+        total:     número total de avaliações
+        positivos: contagem de feedbacks positivos
+        negativos: contagem de feedbacks negativos
+    """
+    total = len(_registro)
+    positivos = sum(1 for r in _registro if r["feedback"] == "positivo")
+    return {
+        "total": total,
+        "positivos": positivos,
+        "negativos": total - positivos,
+    }
+
+
+def todos() -> list[dict]:
+    """
+    Retorna uma cópia de todos os registros.
+    Cópia defensiva: o chamador não pode modificar o estado interno.
+    """
+    return list(_registro)
+
+
+```
+providers/modelo_provider.py
+
+```python
+# =============================================================================
+# providers/modelo_provider.py — Fonte de verdade do modelo de linguagem
+#
+# Responsabilidade: tudo que diz respeito ao modelo fica aqui.
+# O resto do sistema não sabe se o modelo é simulado, OpenAI ou local.
+# Para trocar de provedor (ex: simulação → OpenAI), edite apenas este arquivo.
+# =============================================================================
+
+import random
+
 
 def calcular_confianca(pergunta: str) -> float:
     """
-    Em produção: retornaria logprobs ou outro sinal de confiança do modelo.
-    Aqui simulamos com base no comprimento da pergunta.
-    Perguntas mais específicas tendem a gerar respostas mais confiantes.
+    Estima a confiança do modelo com base na pergunta recebida.
+
+    Em produção: substitua por logprobs da API ou outra métrica real.
+    Aqui usamos comprimento da pergunta como proxy — perguntas mais
+    específicas tendem a gerar contexto mais rico para o modelo.
+
+    Retorna um float entre 0.0 e 1.0.
     """
     if len(pergunta) > 50:
         return round(random.uniform(0.78, 0.95), 2)
@@ -372,348 +764,40 @@ def calcular_confianca(pergunta: str) -> float:
         return round(random.uniform(0.30, 0.54), 2)
 
 
-def gerar_resposta(pergunta: str, historico: list) -> tuple:
+def chamar_modelo(pergunta: str, historico: list) -> tuple[str, float]:
     """
-    Simula um modelo de linguagem gerativo.
-    
+    Chama o modelo de linguagem e retorna resposta + confiança.
+
     Parâmetros:
         pergunta:  mensagem atual do usuário
-        historico: lista de tuplas (pergunta, resposta) — conversa anterior
-    
+        historico: lista de pares [pergunta, resposta] — conversa anterior
+
     Retorna:
-        Um gerador de tokens (para streaming) e o score de confiança.
-    
-    Nota: Em uma integração real com OpenAI/Anthropic/Hugging Face,
-    você iteraria sobre o stream da API em vez de simular com time.sleep.
+        (resposta_completa: str, confianca: float)
+
+    Para integrar com OpenAI, substitua o bloco de simulação por:
+        client = openai.OpenAI()
+        stream = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=_converter_historico(historico) + [{"role": "user", "content": pergunta}],
+            stream=True
+        )
+        resposta = "".join(chunk.choices[0].delta.content or "" for chunk in stream)
     """
     confianca = calcular_confianca(pergunta)
 
-    respostas_simuladas = {
-        "default": (
-            "Compreendi sua pergunta. Com base no contexto fornecido, "
-            "posso indicar que este é um sistema de demonstração que simula "
-            "o comportamento de um modelo de linguagem generativo. "
-            "Em uma implementação real, aqui estaria a resposta do seu modelo, "
-            "gerada token por token via streaming."
-        )
-    }
-
-    resposta = respostas_simuladas["default"]
+    # Simulação de resposta — substitua por chamada real à API
+    resposta = (
+        "Compreendi sua pergunta. Com base no contexto fornecido, "
+        "posso indicar que este é um sistema de demonstração que simula "
+        "o comportamento de um modelo de linguagem generativo. "
+        "Em uma implementação real, aqui estaria a resposta do seu modelo, "
+        "gerada token por token via streaming."
+    )
 
     return resposta, confianca
 
 
-# ─────────────────────────────────────────────
-# CAMADA DE ESTADO
-# ─────────────────────────────────────────────
-
-# Armazena feedback para análise posterior
-# Em produção: persistir em banco de dados
-registro_feedback = []
-
-
-def salvar_feedback(pergunta: str, resposta: str, tipo: str):
-    """Registra feedback do usuário com contexto completo."""
-    registro_feedback.append({
-        "timestamp": datetime.now().isoformat(),
-        "pergunta": pergunta,
-        "resposta": resposta,
-        "feedback": tipo
-    })
-    return registro_feedback
-
-
-# ─────────────────────────────────────────────
-# CAMADA DE INTERFACE
-# ─────────────────────────────────────────────
-
-def processar_mensagem(pergunta: str, historico: list):
-    """
-    Função principal do chatbot.
-    
-    Esta é a função conectada ao evento de submit do chatbot.
-    Ela é um gerador: yield a cada token atualiza o componente de chat.
-    
-    O Gradio gerencia o histórico automaticamente quando usamos gr.ChatInterface,
-    mas aqui usamos gr.Blocks para ter mais controle sobre o layout.
-    """
-    if not pergunta.strip():
-        # Não processar mensagens vazias
-        yield historico, "", "", ""
-        return
-
-    resposta_completa, confianca = gerar_resposta(pergunta, historico)
-
-    # Determinar nível de confiança para feedback visual
-    if confianca >= 0.78:
-        nivel = "🟢 Alta"
-        descricao_confianca = f"Confiança: {int(confianca*100)}% — O modelo tem alta certeza nesta resposta."
-    elif confianca >= 0.55:
-        nivel = "🟡 Média"
-        descricao_confianca = f"Confiança: {int(confianca*100)}% — Recomenda-se verificar informações importantes."
-    else:
-        nivel = "🔴 Baixa"
-        descricao_confianca = f"Confiança: {int(confianca*100)}% — Esta resposta pode conter imprecisões."
-
-    # Iniciar o streaming: adicionar a mensagem do usuário e uma resposta parcial
-    historico_atual = historico + [[pergunta, ""]]
-
-    # Gerar tokens progressivamente — cada yield atualiza o chat
-    texto_parcial = ""
-    for caractere in resposta_completa:
-        texto_parcial += caractere
-        historico_atual[-1][1] = texto_parcial
-        yield historico_atual, descricao_confianca, nivel, resposta_completa
-        time.sleep(0.015)
-
-    # Yield final com resposta completa
-    yield historico_atual, descricao_confianca, nivel, resposta_completa
-
-
-# ─────────────────────────────────────────────
-# CONSTRUÇÃO DO APP
-# ─────────────────────────────────────────────
-
-with gr.Blocks(title="AI Chatbot com Streaming e Feedback", theme=gr.themes.Soft()) as demo:
-
-    # Estado interno — persiste entre interações sem rerun completo
-    # Equivalente ao st.session_state do Streamlit
-    estado_ultima_pergunta = gr.State("")
-    estado_ultima_resposta = gr.State("")
-
-    # ── Cabeçalho ──────────────────────────────────────────────
-    gr.Markdown("# 🤖 Chatbot com Streaming, Confiança e Feedback Humano")
-    gr.Markdown(
-        "Este app demonstra os quatro pilares de UX para IA vistos na Aula 02, "
-        "agora aplicados a um modelo generativo com Gradio:\n"
-        "**Transparência** · **Gestão de Incerteza** · **Design para Latência** · **Human-in-the-loop**"
-    )
-
-    gr.Markdown("---")
-
-    # ── Layout principal ────────────────────────────────────────
-    with gr.Row():
-
-        # Coluna esquerda: chat
-        with gr.Column(scale=3):
-            gr.Markdown("### 💬 Conversa")
-
-            chatbot = gr.Chatbot(
-                label="Histórico",
-                height=400,
-                show_copy_button=True,  # facilita copiar respostas
-                bubble_full_width=False
-            )
-
-            with gr.Row():
-                input_mensagem = gr.Textbox(
-                    label="",
-                    placeholder="Digite sua mensagem e pressione Enter...",
-                    scale=4,
-                    container=False
-                )
-                botao_enviar = gr.Button("Enviar ➤", variant="primary", scale=1)
-
-            botao_limpar = gr.Button("🗑️ Limpar conversa", variant="secondary")
-
-        # Coluna direita: feedback e confiança
-        with gr.Column(scale=2):
-
-            # ── Pilar: Gestão de Incerteza ──────────────────────
-            gr.Markdown("### 📊 Gestão de Incerteza")
-            output_confianca_texto = gr.Textbox(
-                label="Análise de Confiança",
-                lines=2,
-                interactive=False,
-                value="Aguardando resposta..."
-            )
-            output_nivel = gr.Textbox(
-                label="Nível",
-                interactive=False,
-                value=""
-            )
-
-            gr.Markdown("---")
-
-            # ── Pilar: Human-in-the-loop ────────────────────────
-            gr.Markdown("### 👥 Human-in-the-loop")
-            gr.Markdown(
-                "Avalie a última resposta. "
-                "Seu feedback é registrado para retreinamento do modelo."
-            )
-
-            with gr.Row():
-                botao_like = gr.Button("👍 Resposta correta", variant="secondary")
-                botao_dislike = gr.Button("👎 Resposta incorreta", variant="secondary")
-
-            output_feedback_status = gr.Textbox(
-                label="Status do Feedback",
-                interactive=False,
-                value=""
-            )
-
-            gr.Markdown("---")
-
-            # ── Pilar: Transparência (exemplos) ─────────────────
-            gr.Markdown("### 💡 Exemplos para testar")
-            gr.Examples(
-                examples=[
-                    ["Explique o conceito de streaming em interfaces de IA"],
-                    ["O que é human-in-the-loop e por que é importante?"],
-                    ["Como funciona o sistema de confiança deste app?"],
-                    ["Oi"],  # pergunta curta → confiança baixa simulada
-                ],
-                inputs=input_mensagem,
-                label=""
-            )
-
-    # ─────────────────────────────────────────────
-    # CONEXÃO DE EVENTOS
-    # ─────────────────────────────────────────────
-
-    def on_enviar(mensagem, historico):
-        """Wrapper que captura a pergunta para o sistema de feedback."""
-        return mensagem, historico
-
-    # Evento de envio — conecta input ao processamento com streaming
-    botao_enviar.click(
-        fn=processar_mensagem,
-        inputs=[input_mensagem, chatbot],
-        outputs=[chatbot, output_confianca_texto, output_nivel, estado_ultima_resposta],
-    ).then(
-        # Após o streaming terminar, guardar a pergunta no estado
-        fn=lambda msg: msg,
-        inputs=input_mensagem,
-        outputs=estado_ultima_pergunta
-    ).then(
-        # Limpar o campo de input após envio
-        fn=lambda: "",
-        outputs=input_mensagem
-    )
-
-    # Também responde ao Enter
-    input_mensagem.submit(
-        fn=processar_mensagem,
-        inputs=[input_mensagem, chatbot],
-        outputs=[chatbot, output_confianca_texto, output_nivel, estado_ultima_resposta],
-    ).then(
-        fn=lambda msg: msg,
-        inputs=input_mensagem,
-        outputs=estado_ultima_pergunta
-    ).then(
-        fn=lambda: "",
-        outputs=input_mensagem
-    )
-
-    # Evento de feedback positivo
-    def registrar_like(pergunta, resposta):
-        salvar_feedback(pergunta, resposta, "positivo")
-        total = len(registro_feedback)
-        return f"✅ Feedback positivo registrado. Total acumulado: {total} avaliações."
-
-    botao_like.click(
-        fn=registrar_like,
-        inputs=[estado_ultima_pergunta, estado_ultima_resposta],
-        outputs=output_feedback_status
-    )
-
-    # Evento de feedback negativo
-    def registrar_dislike(pergunta, resposta):
-        salvar_feedback(pergunta, resposta, "negativo")
-        total = len(registro_feedback)
-        positivos = sum(1 for r in registro_feedback if r["feedback"] == "positivo")
-        negativos = total - positivos
-        return (
-            f"🔴 Feedback negativo registrado. "
-            f"Total: {total} avaliações ({positivos} positivos, {negativos} negativos)."
-        )
-
-    botao_dislike.click(
-        fn=registrar_dislike,
-        inputs=[estado_ultima_pergunta, estado_ultima_resposta],
-        outputs=output_feedback_status
-    )
-
-    # Limpar histórico do chat
-    botao_limpar.click(
-        fn=lambda: ([], "Aguardando resposta...", "", ""),
-        outputs=[chatbot, output_confianca_texto, output_nivel, output_feedback_status]
-    )
-
-demo.launch()
-```
-
----
-
-## 6. Conectando um Modelo Real (OpenAI / Anthropic)
-
-O app acima funciona com dados simulados. Trocar a camada de simulação por uma chamada real a uma API de LLM exige apenas alterar a função `gerar_resposta`. A estrutura do app permanece idêntica.
-
-```python
-# Exemplo de integração com a API da OpenAI
-# pip install openai
-
-import openai
-import gradio as gr
-
-
-# Boas práticas: nunca hardcode a chave de API
-# Use variável de ambiente: export OPENAI_API_KEY="sua-chave"
-client = openai.OpenAI()
-
-
-def gerar_com_streaming(pergunta: str, historico: list):
-    """
-    Integração real com OpenAI usando streaming.
-    
-    O cliente OpenAI suporta streaming nativo — ao iterar sobre
-    stream.choices[0].delta.content, recebemos tokens progressivamente.
-    Cada token é concatenado e entregue via yield para o Gradio.
-    """
-    # Converter histórico do formato Gradio para formato OpenAI
-    mensagens = []
-    for pergunta_anterior, resposta_anterior in historico:
-        mensagens.append({"role": "user", "content": pergunta_anterior})
-        mensagens.append({"role": "assistant", "content": resposta_anterior})
-
-    # Adicionar mensagem atual
-    mensagens.append({"role": "user", "content": pergunta})
-
-    # Chamada à API com stream=True
-    stream = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=mensagens,
-        stream=True,            # ativa o streaming
-        max_tokens=500,
-        temperature=0.7
-    )
-
-    historico_atual = historico + [[pergunta, ""]]
-    texto_parcial = ""
-
-    # Iterar sobre os chunks de tokens retornados pela API
-    for chunk in stream:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            texto_parcial += delta
-            historico_atual[-1][1] = texto_parcial
-            # yield atualiza o chat a cada token recebido
-            yield historico_atual
-
-
-# App simplificado usando gr.ChatInterface
-# gr.ChatInterface gerencia o histórico automaticamente
-demo = gr.ChatInterface(
-    fn=gerar_com_streaming,
-    title="💬 Chatbot com GPT-4 e Streaming Real",
-    description="Cada token aparece conforme é gerado pela API da OpenAI.",
-    examples=[
-        "O que é streaming em LLMs?",
-        "Explique o conceito de tokens em 3 frases.",
-    ],
-)
-
-demo.launch()
 ```
 
 ### Regra mental
