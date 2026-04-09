@@ -363,10 +363,12 @@ app.py
 # =============================================================================
 
 from features.chatbot.page import criar_interface
+import gradio as gr
 
 if __name__ == "__main__":
     app = criar_interface()
-    app.launch()
+    app.launch(theme=gr.themes.Soft())
+
 
 ```
 
@@ -397,7 +399,7 @@ def criar_interface() -> gr.Blocks:
     (desenvolvimento local, testes, embed em app maior).
     """
 
-    with gr.Blocks(title="AI Chatbot com Streaming e Feedback", theme=gr.themes.Soft()) as app:
+    with gr.Blocks(title="AI Chatbot com Streaming e Feedback") as app:
 
         # ── Estado interno ──────────────────────────────────────────────────
         # gr.State é o equivalente ao st.session_state do Streamlit.
@@ -425,9 +427,7 @@ def criar_interface() -> gr.Blocks:
 
                 chatbot = gr.Chatbot(
                     label="Histórico",
-                    height=400,
-                    show_copy_button=True,
-                    bubble_full_width=False
+                    height=400
                 )
 
                 with gr.Row():
@@ -502,7 +502,7 @@ def criar_interface() -> gr.Blocks:
 
         def _enviar(mensagem, historico):
             """Delega inteiramente ao pipeline — a UI não processa nada."""
-            return pipeline.processar_mensagem(mensagem, historico)
+            yield from pipeline.processar_mensagem(mensagem, historico)
 
         # Evento: clique no botão Enviar
         botao_enviar.click(
@@ -553,6 +553,7 @@ def criar_interface() -> gr.Blocks:
         )
 
     return app
+
 
 
 ```
@@ -625,7 +626,10 @@ def processar_mensagem(pergunta: str, historico: list):
 
     # Inicializar o histórico com a pergunta atual e resposta vazia
     # O Gradio atualiza o chatbot a cada yield desta lista
-    historico_atual = historico + [[pergunta, ""]]
+    historico_atual = historico + [
+    {"role": "user", "content": pergunta},
+    {"role": "assistant", "content": ""}
+]
 
     # Streaming: acumular caractere a caractere e atualizar o chat
     # O padrão de acumulação (texto_parcial += c) é intencional:
@@ -633,7 +637,7 @@ def processar_mensagem(pergunta: str, historico: list):
     texto_parcial = ""
     for caractere in resposta_completa:
         texto_parcial += caractere
-        historico_atual[-1][1] = texto_parcial
+        historico_atual[-1]["content"] = texto_parcial
         yield historico_atual, descricao, nivel, resposta_completa
         time.sleep(0.015)
 
@@ -664,6 +668,7 @@ def registrar_feedback(pergunta: str, resposta: str, tipo: str) -> str:
             f"Total: {dados['total']} avaliações "
             f"({dados['positivos']} positivos, {dados['negativos']} negativos)."
         )
+
 
 
 ```
@@ -731,6 +736,7 @@ def todos() -> list[dict]:
     return list(_registro)
 
 
+
 ```
 providers/modelo_provider.py
 
@@ -796,6 +802,7 @@ def chamar_modelo(pergunta: str, historico: list) -> tuple[str, float]:
     )
 
     return resposta, confianca
+
 
 
 ```
