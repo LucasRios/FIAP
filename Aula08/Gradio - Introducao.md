@@ -296,19 +296,5 @@ demo.launch()
 
 ---
 
-### Extensão sugerida (exercício)
-
-Adicionar:
-- Upload de áudio
-- Transcrição mock
-- Pipeline texto → sentimento
-
----
-
-### Objetivo final
-
-O aluno deve sair com:
-- Entendimento do paradigma de eventos
-- Capacidade de criar apps multimodais
-- Base para deploy em produção (Spaces)
+ 
 
