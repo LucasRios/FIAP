@@ -11,7 +11,8 @@ import gradio as gr
 
 import features.equipamentos.page  as equipamento_page
 import features.cadastro.page      as cadastro_page
-import features.sensores.page  as dados_brutos_page
+import features.sensores.page      as dados_brutos_page
+import features.dashboard.page     as dashboard_page       # Sprint 2
 
 from state.app_state import AppState
 from ui.sidebar      import criar_sidebar
@@ -35,6 +36,9 @@ with gr.Blocks(title="Forzy · Digital Twin") as app:
     with gr.Column(visible=False) as col_dados:
         dados_brutos_page.criar_pagina(state)
 
+    with gr.Column(visible=False) as col_dashboard:      # Sprint 2
+        dashboard_page.criar_pagina(state)
+
     # ── Navegação ───────────────────────────────────────────────────────────
     # A ideia: state.pagina_atual guarda qual página está ativa ("equipamento",
     # "cadastro" ou "dados"). Quando esse valor muda — seja pelo clique
@@ -57,25 +61,29 @@ with gr.Blocks(title="Forzy · Digital Twin") as app:
         mostrar_equipamento = gr.update(visible = pagina == "equipamentos")
         mostrar_cadastro    = gr.update(visible = pagina == "cadastro")
         mostrar_dados       = gr.update(visible = pagina == "dados")
+        mostrar_dashboard   = gr.update(visible = pagina == "dashboard")   # Sprint 2
 
         # Destaca o botão do menu que corresponde à página ativa
         # (Cadastro não tem botão no menu — é acessado pela equipamento)
-        destacar_equipamento = gr.update(variant = "primary" if pagina == "equipamentos" or pagina == "cadastro" else "secondary")
-        destacar_dados = gr.update(variant = "primary" if pagina == "dados" else "secondary")
+        destacar_equipamento = gr.update(variant = "primary" if pagina in ("equipamentos", "cadastro") else "secondary")
+        destacar_dados       = gr.update(variant = "primary" if pagina == "dados"      else "secondary")
+        destacar_dashboard   = gr.update(variant = "primary" if pagina == "dashboard"  else "secondary")  # Sprint 2
 
-        return mostrar_equipamento, mostrar_cadastro, mostrar_dados, destacar_equipamento, destacar_dados
+        return mostrar_equipamento, mostrar_cadastro, mostrar_dados, mostrar_dashboard, destacar_equipamento, destacar_dados, destacar_dashboard
 
     # Conecta _navegar ao estado — dispara sempre que pagina_atual mudar
     state.pagina_atual.change(
         fn=_navegar,
         inputs=state.pagina_atual,
-        outputs=[col_equipamento, col_cadastro, col_dados, botoes["equipamentos"], botoes["dados"]],
+        outputs=[col_equipamento, col_cadastro, col_dados, col_dashboard,
+                 botoes["equipamentos"], botoes["dados"], botoes["dashboard"]],
     )
 
     # Botões do menu: cada um escreve o nome da sua página em pagina_atual
     # O .change() acima cuida do resto automaticamente
-    botoes["equipamentos"].click(fn=lambda: "equipamentos",  outputs=state.pagina_atual)
-    botoes["dados"].click(fn=lambda: "dados", outputs=state.pagina_atual)
+    botoes["equipamentos"].click(fn=lambda: "equipamentos", outputs=state.pagina_atual)
+    botoes["dados"].click(fn=lambda: "dados",               outputs=state.pagina_atual)
+    botoes["dashboard"].click(fn=lambda: "dashboard",       outputs=state.pagina_atual)  # Sprint 2
 
 
-app.launch()
+app.launch(share=True,inbrowser=True)

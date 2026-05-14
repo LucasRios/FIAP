@@ -61,11 +61,15 @@ def criar_sidebar(open: bool = True) -> dict[str, gr.Button]:
         # Dados de Sensores — acessível diretamente pelo menu
         btn_dados = gr.Button("📡  Dados de Sensores", variant="secondary", size="sm")
 
+        # Dashboard Operacional — Sprint 2
+        btn_dashboard = gr.Button("📊  Dashboard",        variant="secondary", size="sm")
+
         gr.Markdown("---")
-        gr.Markdown("_Sprint 1 — Fundamentos_")
+        gr.Markdown("_Sprint 2 — Visualização Operacional_")
 
     # Retorna apenas os botões que o app.py precisa conectar a eventos
     return {
-        "equipamentos":  btn_equipamento,
-        "dados": btn_dados,
+        "equipamentos": btn_equipamento,
+        "dados":        btn_dados,
+        "dashboard":    btn_dashboard,
     }

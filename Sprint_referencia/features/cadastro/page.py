@@ -1,17 +1,3 @@
-# =============================================================================
-# features/cadastro/page.py — Tela de Cadastro Técnico
-#
-# Mudanças nesta versão:
-#   - Removido o bloco "Carregar TAG existente" (a equipamento já passa a TAG)
-#   - Duas abas:
-#       Aba 1 "📄 Ficha Técnica" → visualização somente leitura
-#       Aba 2 "✏️ Edição"        → formulário de edição
-#   - Botão "Voltar" em ambas as abas → retorna para equipamento
-#   - Reage a state.modo_cadastro:
-#       "novo"   → abre na aba de Edição com formulário limpo
-#       "edicao" → abre na aba de Ficha Técnica com dados da TAG
-# =============================================================================
-
 import gradio as gr
 
 import pipelines.cadastro_pipeline as pipeline
@@ -121,18 +107,7 @@ def criar_pagina(state: AppState) -> None:
     # e carregando os dados.
 
     def _abrir_pagina(tag: str, modo: str):
-        """
-        Chamada quando a equipamento navega para esta tela.
-
-        modo "novo":
-            - Abre na aba de Edição (id=1) com formulário limpo
-            - Ficha técnica fica com mensagem padrão
-
-        modo "edicao":
-            - Abre na aba de Ficha Técnica (id=0) com dados da TAG
-            - Preenche também o formulário de edição para que o usuário
-              possa trocar de aba sem precisar recarregar
-        """
+        
         if modo == "novo" or not tag:
             return (
                 gr.update(selected=1),      # abre aba Edição

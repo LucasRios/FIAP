@@ -102,7 +102,7 @@ def criar_pagina(state: AppState) -> None:
     ).then(
         fn=lambda: "cadastro",
         outputs=state.pagina_atual,            # ← depois navega
-    )
+    )   
 
     # Botão "Ver Dados de Sensores": passa a TAG da linha, navega para Dados
     botao_dados.click(
