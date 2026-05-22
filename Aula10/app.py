@@ -298,22 +298,30 @@ def grafico_plotly_3d():
 # =============================================================================
 
 def baixar_imagem_planta():
-    """
-    Baixa uma imagem pública de exemplo para usar como fundo.
-    Retorna um array numpy (formato que imshow aceita).
-    Em produção você carregaria do disco: Image.open("planta.png")
-    """
     url = "https://dummyimage.com/800x600/add8e6/add8e6.png"
+
+    # Criamos uma requisição fingindo ser um navegador comum (User-Agent)
+    # Isso evita que o site bloqueie o Python por achar que é um ataque/bot
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    req = urllib.request.Request(url, headers=headers)
+
     try:
-        # Baixa os bytes da imagem e abre com PIL
-        with urllib.request.urlopen(url, timeout=5) as resposta:
+        # Baixa os bytes usando a requisição configurada
+        with urllib.request.urlopen(req, timeout=5) as resposta:
             bytes_imagem = resposta.read()
+
         imagem_pil = Image.open(io.BytesIO(bytes_imagem)).convert("RGB")
-        return np.array(imagem_pil)   # Converte para array numpy (H, W, 3)
-    except Exception:
-        # Fallback: cria uma imagem colorida sintética se o download falhar
+        return np.array(imagem_pil)
+
+    except Exception as e:
+        # DICA DE OURO: Vamos printar o erro real no terminal antes de retornar o fallback.
+        # Assim você descobre exatamente qual linha/motivo está quebrando!
+        print(f"Erro real detectado: {e}")
+
         imagem_sintetica = np.zeros((200, 300, 3), dtype=np.uint8)
-        imagem_sintetica[:, :, 0] = 200   # Canal vermelho: fundo avermelhado
+        imagem_sintetica[:, :, 0] = 200
         return imagem_sintetica
 
 
