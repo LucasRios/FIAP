@@ -320,6 +320,54 @@ def baixar_imagem_planta():
 # Carrega a imagem uma vez quando o módulo é importado
 IMAGEM_FUNDO = baixar_imagem_planta()
 
+def gerar_grafico_com_fundo():
+    # 1. Cria a figura e adiciona alguns dados de exemplo
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=[1, 2, 3, 4, 5], 
+        y=[10, 15, 13, 17, 20], 
+        mode="lines+markers",
+        line=dict(color="red", width=4),
+        marker=dict(size=12)
+    ))
+
+    # 2. Adiciona a imagem de fundo
+    fig.add_layout_image(
+        dict(
+            # Pode ser uma URL ou uma imagem em Base64 (para arquivos locais)
+            source="https://images.unsplash.com/photo-1534796636912-3652897c2081?q=80&w=1000",
+            
+            # Usar 'paper' faz a imagem se basear no tamanho do gráfico, não nos eixos X/Y
+            xref="paper", 
+            yref="paper",
+            
+            # Posição inicial (topo esquerdo)
+            x=0, 
+            y=1,
+            
+            # Tamanho (1 = 100% da área do gráfico)
+            sizex=1, 
+            sizey=1,
+            
+            # 'stretch' estica a imagem, 'contain' mantém a proporção
+            sizing="stretch",
+            
+            # Transparência da imagem
+            opacity=0.3,
+            
+            # Fundamental: coloca a imagem ATRÁS das linhas do gráfico
+            layer="below"
+        )
+    )
+
+    # Opcional: remove o fundo cinza/branco padrão do Plotly para a imagem aparecer bem
+    fig.update_layout(
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        title="Gráfico com Imagem de Fundo",
+    )
+
+    return fig
 
 def grafico_com_fundo(ponto_x, ponto_y):
     """
@@ -704,6 +752,12 @@ with gr.Blocks(title="Aula: Gráficos no Gradio") as demo:
         slider_x.change(fn=grafico_com_fundo, inputs=[slider_x, slider_y], outputs=grafico_fundo)
         slider_y.change(fn=grafico_com_fundo, inputs=[slider_x, slider_y], outputs=grafico_fundo)
         demo.load(fn=lambda: grafico_com_fundo(4.0, 4.0), outputs=grafico_fundo)
+        
+        grafico_output = gr.Plot()
+        
+        demo.load(fn=gerar_grafico_com_fundo, inputs=[], outputs=grafico_output)
+
+
 
     # ── Linha 5: Bolas sobre imagem ─────────────────────────────────────────────
     with gr.Accordion("5 — Bolas sobre Imagem (PIL)"):
