@@ -303,7 +303,7 @@ def baixar_imagem_planta():
     Retorna um array numpy (formato que imshow aceita).
     Em produção você carregaria do disco: Image.open("planta.png")
     """
-    url = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/280px-PNG_transparency_demonstration_1.png"
+    url = "https://dummyimage.com/800x600/add8e6/add8e6.png"
     try:
         # Baixa os bytes da imagem e abre com PIL
         with urllib.request.urlopen(url, timeout=5) as resposta:
@@ -335,7 +335,7 @@ def gerar_grafico_com_fundo():
     fig.add_layout_image(
         dict(
             # Pode ser uma URL ou uma imagem em Base64 (para arquivos locais)
-            source="https://images.unsplash.com/photo-1534796636912-3652897c2081?q=80&w=1000",
+            source="https://dummyimage.com/800x600/add8e6/add8e6.png",
             
             # Usar 'paper' faz a imagem se basear no tamanho do gráfico, não nos eixos X/Y
             xref="paper", 
