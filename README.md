@@ -1,5 +1,11 @@
 # FIAP — Gen AI Front-End Engineering
 
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.x-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
+![Gradio](https://img.shields.io/badge/Gradio-4.x-F97316?style=flat-square)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-Keras-FF6F00?style=flat-square&logo=tensorflow&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
+
 Repositório com os materiais, exercícios e projetos desenvolvidos durante o curso de **Engenharia de Front-End para IA Generativa** na FIAP.
 
 O curso aborda a construção de interfaces inteligentes com **Streamlit** e **Gradio**, cobrindo desde os fundamentos de UX para IA até arquitetura modular, autenticação, integração com NLP e deploy.
@@ -59,6 +65,23 @@ app.py                  ← entry point
 
 ---
 
+## Como Executar
+
+**Pré-requisitos:** Python 3.10+
+
+```bash
+# Instale as dependências de cada aula/projeto individualmente
+pip install -r requirements.txt
+
+# Execute a aplicação Streamlit
+streamlit run app.py
+
+# Ou Gradio
+python app.py
+```
+
+---
+
 ## Tecnologias
 
 - **Python 3.10+**
@@ -74,3 +97,9 @@ app.py                  ← entry point
 
 **FIAP** — Faculdade de Informática e Administração Paulista  
 Curso: Engenharia de Front-End para IA Generativa
+
+---
+
+## Licença
+
+MIT
