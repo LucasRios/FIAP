@@ -1,0 +1,42 @@
+# =============================================================================
+# docker-compose.yml — Aula 19
+# NOVO NESTA AULA: este arquivo inteiro. Orquestra backend e frontend juntos.
+#
+# Como rodar:
+#   docker-compose up --build
+# =============================================================================
+version: "3.9"
+
+services:
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"          # host:container
+    env_file:
+      - ./backend/.env       # nunca commitado — veja backend/.env.example
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs-info"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8501:8501"
+    environment:
+      # Dentro da rede Docker, os serviços se comunicam pelo NOME do
+      # serviço, não por "localhost" — por isso "backend", não "127.0.0.1".
+      - API_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy  # só sobe depois que o back estiver saudável
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
