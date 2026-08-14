@@ -153,6 +153,16 @@ O `provider.py` era o ponto de contato com o modelo ou banco de dados. Ele ficav
 # pip install fastapi uvicorn google-genai python-dotenv
 # criar o .env no diretório do projeto e incluir GEMINI_API_KEY=chave_real_do_ai_studio
 # main.py
+"""
+API de classificação de texto com FastAPI + Gemini (Google AI Studio).
+
+Executar:
+    pip install -r requirements.txt
+    uvicorn main:app --reload
+
+Documentação interativa: http://127.0.0.1:8000/docs
+"""
+ 
 import os
 
 from dotenv import load_dotenv
@@ -161,51 +171,105 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-load_dotenv()  # carrega o .env para as variáveis de ambiente
+  
+# ---------------------------------------------------------------------------
+# CONFIGURAÇÃO / SEGREDOS
+# ---------------------------------------------------------------------------
+# Lê o arquivo .env e joga o conteúdo em variáveis de ambiente.
+# IMPORTANTE: load_dotenv() NÃO sobrescreve variáveis já definidas no sistema.
+# Por isso o mesmo código funciona em produção (Docker, Render, Azure...),
+# onde não existe arquivo .env e as variáveis vêm do próprio ambiente.
+load_dotenv()
 
+# ---------------------------------------------------------------------------
+# APLICAÇÃO
+# ---------------------------------------------------------------------------
+# title e version aparecem no Swagger (/docs) e no OpenAPI (/openapi.json).
 app = FastAPI(title="API de IA", version="1.0.0")
 
-MODELO = "gemini-2.5-flash"
+# Nome do modelo isolado em constante: trocar de modelo = mudar uma linha.
+# O catálogo do Gemini muda com o tempo; para ver o que sua chave tem acesso:
+#     for m in client.models.list(): print(m.name)
+MODELO = "gemini-3.5-flash"
 
-# Cliente único reaproveitado entre requests (evita novo handshake TLS a cada chamada)
+# Cliente criado UMA vez, no import do módulo, e reaproveitado em todas as
+# requisições. Criar o client dentro do endpoint faria um novo handshake TLS
+# a cada chamada — desperdício de tempo e memória.
+# os.environ["..."] com colchetes falha logo no startup se a chave não existir
+# (melhor do que descobrir o problema só na primeira requisição do usuário).
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-# A instrução fica em system_instruction: o texto do usuário nunca é
-# concatenado ao prompt de sistema, mitigando prompt injection.
+# Configuração da geração, também definida uma única vez porque é imutável.
 CONFIG = types.GenerateContentConfig(
+    # A instrução vai em system_instruction, NÃO concatenada ao texto do usuário.
+    # Isso separa "ordem do desenvolvedor" de "dado do usuário" e reduz o risco
+    # de prompt injection (usuário mandar algo como "ignore as instruções acima").
     system_instruction=(
         "Classifique o texto enviado pelo usuário. "
         "Responda apenas com a categoria, sem explicações."
     ),
+
+    # Teto de tokens da resposta. Protege contra respostas enormes e custo alto.
     max_output_tokens=100,
+
+    # 0 = saída determinística. Para classificação queremos consistência,
+    # não criatividade. Valores altos (0.7~1.0) servem para texto criativo.
     temperature=0,
-    # Sem limitar o thinking, o 2.5 pode gastar todo o max_output_tokens
-    # em raciocínio interno e devolver texto vazio.
+
+    # Os modelos recentes "pensam" antes de responder, e esse raciocínio
+    # consome o max_output_tokens. Com orçamento 0, todo o limite fica para a
+    # resposta final — sem isso, a API pode devolver texto vazio.
     thinking_config=types.ThinkingConfig(thinking_budget=0),
+
+    # Automatic Function Calling vem ligado por padrão e emite aviso no fluxo
+    # assíncrono. Como não declaramos nenhuma tool, não há função a executar:
+    # desligar remove o warning e o overhead.
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
 )
 
 
+# ---------------------------------------------------------------------------
+# CONTRATO DE ENTRADA
+# ---------------------------------------------------------------------------
 class EntradaClassificacao(BaseModel):
+    """Corpo esperado no POST. O Pydantic valida antes de o endpoint rodar."""
+
+    # min_length evita chamada à API com string vazia.
+    # max_length limita o custo por requisição e barra payloads abusivos.
+    # Falhando a validação, o FastAPI responde 422 sozinho — não chega ao Gemini.
     texto: str = Field(min_length=1, max_length=5000)
 
 
+# ---------------------------------------------------------------------------
+# ENDPOINT
+# ---------------------------------------------------------------------------
 @app.post("/v1/classificar")
 async def classificar_texto(entrada: EntradaClassificacao):
+    """Recebe um texto e devolve a categoria atribuída pelo modelo."""
+
     try:
+        # async def + client.aio + await: enquanto esta requisição espera a
+        # resposta da rede, o servidor atende outras. Com def comum e chamada
+        # síncrona, a thread ficaria bloqueada durante toda a espera.
         resposta = await client.aio.models.generate_content(
             model=MODELO,
-            contents=entrada.texto,
+            contents=entrada.texto,  # apenas o dado do usuário
             config=CONFIG,
         )
-    except Exception as exc:
+    except Exception as exc: 
+
+        # O cliente recebe só uma mensagem genérica: detalhes internos não
+        # devem vazar em resposta HTTP. 502 = falha em serviço externo.
+        # "from exc" preserva a exceção original na cadeia do traceback.
         raise HTTPException(status_code=502, detail="Falha ao consultar o modelo") from exc
 
-    if not resposta.text:
-        raise HTTPException(
-            status_code=502,
-            detail="Resposta vazia ou bloqueada por filtro de segurança",
-        )
+    # A API pode retornar sucesso sem texto: filtro de segurança, limite de
+    # tokens atingido, etc. Sem esta checagem, resposta.text seria None e o
+    # .strip() abaixo quebraria com AttributeError.
+    if not resposta.text: 
+        raise HTTPException(status_code=502, detail="Resposta vazia ou bloqueada")
 
+    # strip() remove quebras de linha e espaços que o modelo costuma incluir.
     return {"resultado": resposta.text.strip()}
 ```
 
