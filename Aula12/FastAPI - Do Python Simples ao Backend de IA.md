@@ -148,43 +148,65 @@ UI → Feature → Pipeline → Provider
 ```
 
 O `provider.py` era o ponto de contato com o modelo ou banco de dados. Ele ficava dentro do mesmo processo do Streamlit. Agora, esse provider se torna uma **rota FastAPI**:
-
+ 
 ```python
-# Antes (semestre 1) — provider.py dentro do Streamlit
-# providers/modelo_provider.py
-import anthropic
-
-def classificar_texto(texto: str) -> dict:
-    client = anthropic.Anthropic()
-    resposta = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=100,
-        messages=[{"role": "user", "content": f"Classifique: {texto}"}]
-    )
-    return {"resultado": resposta.content[0].text}
-```
-
-```python
-# Depois (semestre 2) — provider.py vira rota FastAPI
+# pip install fastapi uvicorn google-genai python-dotenv
+# criar o .env no diretório do projeto e incluir GEMINI_API_KEY=chave_real_do_ai_studio
 # main.py
-from fastapi import FastAPI
-from pydantic import BaseModel
-import anthropic
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from google import genai
+from google.genai import types
+from pydantic import BaseModel, Field
+
+load_dotenv()  # carrega o .env para as variáveis de ambiente
 
 app = FastAPI(title="API de IA", version="1.0.0")
 
+MODELO = "gemini-2.5-flash"
+
+# Cliente único reaproveitado entre requests (evita novo handshake TLS a cada chamada)
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+
+# A instrução fica em system_instruction: o texto do usuário nunca é
+# concatenado ao prompt de sistema, mitigando prompt injection.
+CONFIG = types.GenerateContentConfig(
+    system_instruction=(
+        "Classifique o texto enviado pelo usuário. "
+        "Responda apenas com a categoria, sem explicações."
+    ),
+    max_output_tokens=100,
+    temperature=0,
+    # Sem limitar o thinking, o 2.5 pode gastar todo o max_output_tokens
+    # em raciocínio interno e devolver texto vazio.
+    thinking_config=types.ThinkingConfig(thinking_budget=0),
+)
+
+
 class EntradaClassificacao(BaseModel):
-    texto: str
+    texto: str = Field(min_length=1, max_length=5000)
+
 
 @app.post("/v1/classificar")
-def classificar_texto(entrada: EntradaClassificacao):
-    client = anthropic.Anthropic()
-    resposta = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=100,
-        messages=[{"role": "user", "content": f"Classifique: {entrada.texto}"}]
-    )
-    return {"resultado": resposta.content[0].text}
+async def classificar_texto(entrada: EntradaClassificacao):
+    try:
+        resposta = await client.aio.models.generate_content(
+            model=MODELO,
+            contents=entrada.texto,
+            config=CONFIG,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Falha ao consultar o modelo") from exc
+
+    if not resposta.text:
+        raise HTTPException(
+            status_code=502,
+            detail="Resposta vazia ou bloqueada por filtro de segurança",
+        )
+
+    return {"resultado": resposta.text.strip()}
 ```
 
 A diferença: agora qualquer cliente (Streamlit, Gradio, app mobile, outro serviço) pode chamar `/v1/classificar` via HTTP. O modelo não está preso a nenhuma interface.
