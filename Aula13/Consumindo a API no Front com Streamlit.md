@@ -266,7 +266,29 @@ GEMINI_API_KEY=chave_real_do_ai_studio
 API_KEY=minha-chave-secreta-aqui
 BEARER_TOKEN=um-token-fixo-para-fins-didaticos
 ```
-
+```python
+"""
+Gera uma chave/token seguro para usar como API_KEY ou BEARER_TOKEN no .env.
+Execução: python gerar_chave.py
+"""
+ 
+import secrets
+ 
+ 
+def gerar_urlsafe(tamanho_bytes: int = 32) -> str:
+    """Formato compacto, seguro para header HTTP. Recomendado."""
+    return secrets.token_urlsafe(tamanho_bytes)
+ 
+ 
+def gerar_hex(tamanho_bytes: int = 32) -> str:
+    """Formato hexadecimal, mais longo, só caracteres 0-9a-f."""
+    return secrets.token_hex(tamanho_bytes)
+ 
+ 
+if __name__ == "__main__":
+    print("token_urlsafe:", gerar_urlsafe())
+    print("token_hex:    ", gerar_hex())
+```
 ## 4.4 O que NÃO fazer
 
 ```python
