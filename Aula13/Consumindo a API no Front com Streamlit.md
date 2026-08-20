@@ -2,26 +2,27 @@
 
 ## Objetivo
 
-Conectar o Streamlit ao FastAPI criado na aula anterior usando a biblioteca `requests`. Tratar erros de forma que o usuário entenda o que aconteceu. Introduzir autenticação via API Key — a primeira camada de segurança que todo front-end de IA precisa implementar.
+Conectar o Streamlit ao FastAPI usando a biblioteca `requests`, desta vez construindo um **chatbot** que conversa com o Gemini através do back-end da Aula 1. Tratar erros de forma que o usuário entenda o que aconteceu. Introduzir autenticação — via header customizado (API Key) e via **Bearer Token** — a primeira camada de segurança que todo front-end de IA precisa implementar.
 
 ---
 
 # 1. O Papel do Front-end como Cliente HTTP
 
-Na Aula 0 vimos que o front-end é o cliente da API. Agora vamos implementar isso. O Streamlit vai parar de chamar o provider diretamente e vai passar a fazer requisições HTTP para o FastAPI.
+Na Aula 0 vimos que o front-end é o cliente da API. Agora vamos implementar isso. O Streamlit vai parar de chamar o Gemini diretamente e vai passar a fazer requisições HTTP para o FastAPI que construímos na Aula 1.
 
 ```
 # Antes
-Streamlit → provider.py → modelo
+Streamlit → google-genai → modelo
 
 # Depois
-Streamlit → requests.post(...) → FastAPI → provider.py → modelo
+Streamlit (chat) → requests.post(...) → FastAPI → google-genai → modelo
 ```
 
 A mudança parece simples, mas ela habilita:
 - Qualquer outro front-end (Gradio, mobile, outro time) pode consumir o mesmo back
 - O modelo pode ser atualizado sem tocar no front
 - O back-end pode escalar independentemente
+- O back-end pode manter o histórico da conversa em memória de forma centralizada
 
 ---
 
@@ -36,16 +37,11 @@ pip install requests
 ```python
 import requests
 
-# GET — buscar dados
-resposta = requests.get("http://localhost:8000/v1/historico")
-
-# POST — enviar dados para processamento
 resposta = requests.post(
-    "http://localhost:8000/v1/analise/sentimento",
-    json={"texto": "O produto chegou com defeito."}
+    "http://localhost:8000/v1/chat",
+    json={"mensagem": "Oi, tudo bem?"}
 )
 
-# A resposta sempre tem:
 resposta.status_code   # 200, 422, 500...
 resposta.json()        # o corpo em dicionário Python
 resposta.text          # o corpo como string bruta
@@ -54,182 +50,227 @@ resposta.headers       # os headers da resposta
 
 ---
 
-# 3. Integração Básica com Streamlit
+# 3. O Backend: Endpoint de Chat com Gemini
 
-O padrão mais simples: o usuário digita algo, clica em um botão, o Streamlit chama a API, e o resultado aparece na tela.
+Na Aula 1 construímos `/v1/classificar`. Agora vamos construir `/v1/chat`, seguindo a mesma arquitetura em camadas (rota → provider → modelo), mas com duas diferenças importantes: o endpoint mantém **histórico de conversa** e fica protegido por **autenticação**.
 
-```python
-import streamlit as st
-import requests
+## 3.1 Estrutura de projeto
 
-st.set_page_config(page_title="Análise de Sentimento", layout="wide")
-st.title("Análise de Sentimento")
-
-API_URL = "http://localhost:8000"
-
-texto = st.text_area("Digite o texto para análise:")
-botao = st.button("Analisar")
-
-if botao and texto:
-    resposta = requests.post(
-        f"{API_URL}/v1/analise/sentimento",
-        json={"texto": texto}
-    )
-    resultado = resposta.json()
-    st.write(f"Sentimento: {resultado['sentimento']}")
-    st.write(f"Confiança: {resultado['confianca']:.0%}")
+```
+meu_projeto_backend/
+├── main.py                  ← cria o app, inclui os routers
+├── routers/
+│   └── chat.py               ← endpoint /v1/chat
+├── models/
+│   ├── entrada.py            ← Pydantic de request
+│   └── saida.py              ← Pydantic de response
+├── providers/
+│   └── gemini_provider.py    ← toda a lógica de chamada ao Gemini
+├── auth/
+│   └── seguranca.py          ← validação de API Key / Bearer Token
+├── .env
+└── requirements.txt
 ```
 
-Isso funciona, mas tem um problema grave: **não trata erros**. Se a API estiver fora do ar, o Streamlit vai mostrar um erro Python feio para o usuário. Vamos corrigir isso.
+Essa separação é a mesma proposta na Aula 1: o `provider` não sabe que existe um FastAPI, e o `router` não sabe como o Gemini funciona por dentro. Trocar de modelo, ou até de fornecedor de IA, significa mexer só no `provider`.
 
----
-
-# 4. Tratamento de Erros — A Diferença entre Protótipo e Produto
-
-Um front-end de produção nunca expõe erros técnicos diretamente para o usuário. Erros de API podem acontecer por vários motivos:
-
-| Situação | Status Code | O que o usuário deve ver |
-|----------|-------------|--------------------------|
-| Back-end fora do ar | Exceção de conexão | "Serviço temporariamente indisponível" |
-| Dados inválidos enviados | 422 | "Verifique os dados e tente novamente" |
-| Não autorizado | 401 | "Sessão expirada, faça login novamente" |
-| Recurso não encontrado | 404 | "Análise não encontrada" |
-| Erro interno do servidor | 500 | "Ocorreu um erro. Tente novamente em instantes" |
+## 3.2 O provider — `providers/gemini_provider.py`
 
 ```python
-import streamlit as st
-import requests
-from requests.exceptions import ConnectionError, Timeout
+"""
+Provider responsável por toda a comunicação com o Gemini.
+Isolado do FastAPI: pode ser testado ou reaproveitado sem nenhum router.
+"""
 
-API_URL = "http://localhost:8000"
-
-def chamar_api_sentimento(texto: str) -> dict | None:
-    """
-    Chama o endpoint de sentimento e trata todos os erros possíveis.
-    Retorna o dicionário de resultado ou None em caso de falha.
-    """
-    try:
-        resposta = requests.post(
-            f"{API_URL}/v1/analise/sentimento",
-            json={"texto": texto},
-            timeout=10  # não espera indefinidamente
-        )
-
-        if resposta.status_code == 200:
-            return resposta.json()
-
-        elif resposta.status_code == 422:
-            st.warning("Os dados enviados são inválidos. Verifique o texto e tente novamente.")
-
-        elif resposta.status_code == 401:
-            st.error("Sessão expirada. Faça login novamente.")
-
-        elif resposta.status_code == 500:
-            st.error("Ocorreu um erro no servidor. Tente novamente em instantes.")
-
-        else:
-            st.error(f"Erro inesperado ({resposta.status_code}).")
-
-    except ConnectionError:
-        st.error("Não foi possível conectar ao servidor. Verifique se o back-end está rodando.")
-
-    except Timeout:
-        st.error("A requisição demorou demais. O servidor pode estar sobrecarregado.")
-
-    return None
-
-
-# Interface
-st.title("Análise de Sentimento")
-texto = st.text_area("Digite o texto:")
-
-if st.button("Analisar") and texto:
-    with st.spinner("Analisando..."):
-        resultado = chamar_api_sentimento(texto)
-
-    if resultado:
-        col1, col2 = st.columns(2)
-        col1.metric("Sentimento", resultado["sentimento"])
-        col2.metric("Confiança", f"{resultado['confianca']:.0%}")
-```
-
-O `st.spinner` é um detalhe importante de UX: indica ao usuário que algo está acontecendo enquanto aguarda a resposta da API. Revise a Aula 02 do semestre 1 para relembrar os pilares de UX para IA — esta é a **Gestão de Expectativa e Incerteza** aplicada ao consumo de API.
-
----
-
-# 5. Autenticação — API Key
-
-Qualquer API exposta na internet precisa de autenticação. O padrão mais simples é a **API Key**: uma string secreta que o cliente envia no header de cada requisição. O servidor verifica se a key é válida antes de processar.
-
-## No FastAPI (back-end)
-
-```python
-# main.py
-from fastapi import FastAPI, HTTPException, Security
-from fastapi.security import APIKeyHeader
 import os
+from google import genai
+from google.genai import types
 
-app = FastAPI()
+MODELO = "gemini-3.5-flash"
 
-# O header que o cliente deve enviar
-api_key_header = APIKeyHeader(name="X-API-Key")
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-# A key válida vem de uma variável de ambiente — nunca hardcode
-API_KEY_VALIDA = os.getenv("API_KEY")
+CONFIG = types.GenerateContentConfig(
+    system_instruction=(
+        "Você é um assistente de chat útil e direto. "
+        "Responda de forma clara e objetiva."
+    ),
+    max_output_tokens=800,
+    temperature=0.7,  # chat se beneficia de alguma variação, diferente da classificação
+    thinking_config=types.ThinkingConfig(thinking_budget=0),
+    automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+)
 
-def verificar_api_key(api_key: str = Security(api_key_header)):
-    if api_key != API_KEY_VALIDA:
-        raise HTTPException(status_code=401, detail="API Key inválida")
-    return api_key
 
-@app.post("/v1/analise/sentimento")
-def analisar(entrada: EntradaAnalise, api_key: str = Security(verificar_api_key)):
-    # Se chegou aqui, a key foi validada
-    return modelo_provider.classificar(entrada.texto)
+async def enviar_mensagem(historico: list[dict], mensagem: str) -> str:
+    """
+    Envia o histórico da conversa + a nova mensagem ao Gemini.
+    `historico` é uma lista de dicts no formato {"role": "user"|"model", "text": "..."}.
+    """
+    # Monta os `contents` no formato que a API do Gemini espera:
+    # uma lista alternando turnos de usuário e do modelo.
+    contents = [
+        types.Content(role=turno["role"], parts=[types.Part(text=turno["text"])])
+        for turno in historico
+    ]
+    contents.append(types.Content(role="user", parts=[types.Part(text=mensagem)]))
+
+    resposta = await client.aio.models.generate_content(
+        model=MODELO,
+        contents=contents,
+        config=CONFIG,
+    )
+
+    if not resposta.text:
+        raise ValueError("Resposta vazia ou bloqueada pelo modelo")
+
+    return resposta.text.strip()
 ```
 
-## No Streamlit (front-end)
-
-A API Key não pode estar no código — ela precisa vir de uma variável de ambiente ou de `st.secrets`.
+## 3.3 Os contratos — `models/entrada.py` e `models/saida.py`
 
 ```python
-# .streamlit/secrets.toml  (nunca commitar esse arquivo)
-API_KEY = "minha-chave-secreta-aqui"
-API_URL = "http://localhost:8000"
+# models/entrada.py
+from pydantic import BaseModel, Field
+
+
+class Turno(BaseModel):
+    """Um turno já ocorrido na conversa, enviado pelo front a cada requisição."""
+    role: str = Field(pattern="^(user|model)$")
+    text: str
+
+
+class EntradaChat(BaseModel):
+    mensagem: str = Field(min_length=1, max_length=4000)
+    historico: list[Turno] = Field(default_factory=list)
 ```
 
 ```python
-# app.py
-import streamlit as st
-import requests
+# models/saida.py
+from pydantic import BaseModel
 
-# st.secrets lê o arquivo .streamlit/secrets.toml
-API_KEY = st.secrets["API_KEY"]
-API_URL = st.secrets["API_URL"]
 
-def chamar_api_sentimento(texto: str) -> dict | None:
+class SaidaChat(BaseModel):
+    resposta: str
+```
+
+O front-end é responsável por guardar e reenviar o histórico a cada chamada — o back-end aqui é **stateless**: não guarda sessão de ninguém. É a forma mais simples de escalar (qualquer instância do FastAPI pode atender qualquer requisição, já que nada fica em memória local do servidor).
+
+## 3.4 O router — `routers/chat.py`
+
+```python
+from fastapi import APIRouter, HTTPException, Depends
+
+from models.entrada import EntradaChat
+from models.saida import SaidaChat
+from providers import gemini_provider
+from auth.seguranca import validar_credenciais
+
+router = APIRouter()
+
+
+@router.post("/", response_model=SaidaChat)
+async def conversar(entrada: EntradaChat, _=Depends(validar_credenciais)):
+    """Recebe mensagem + histórico e devolve a resposta do Gemini."""
+    historico = [{"role": t.role, "text": t.text} for t in entrada.historico]
+
     try:
-        resposta = requests.post(
-            f"{API_URL}/v1/analise/sentimento",
-            json={"texto": texto},
-            headers={"X-API-Key": API_KEY},  # a key vai no header
-            timeout=10
-        )
-        if resposta.status_code == 200:
-            return resposta.json()
-        elif resposta.status_code == 401:
-            st.error("Erro de autenticação com o servidor.")
-        else:
-            st.error(f"Erro {resposta.status_code}.")
-    except Exception as e:
-        st.error("Não foi possível conectar ao servidor.")
-    return None
+        texto_resposta = await gemini_provider.enviar_mensagem(historico, entrada.mensagem)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Falha ao consultar o modelo") from exc
+
+    return SaidaChat(resposta=texto_resposta)
 ```
 
-## O que NÃO fazer
+## 3.5 O `main.py`
 
 ```python
-# NUNCA faça isso — a key fica exposta no código
+from fastapi import FastAPI
+from routers import chat
+
+app = FastAPI(title="API de Chat com IA", version="1.0.0")
+
+app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
+```
+
+```bash
+uvicorn main:app --reload --port 8000
+```
+
+---
+
+# 4. Autenticação — Duas Formas de Proteger a API
+
+Toda API exposta na internet precisa de autenticação. Vamos implementar as duas formas mais comuns, no mesmo módulo, para comparar.
+
+## 4.1 API Key em header customizado
+
+O padrão que já vimos: uma string secreta enviada em um header próprio (`X-API-Key`). Simples, direto, muito usado entre serviços internos.
+
+## 4.2 Bearer Token
+
+Padrão do cabeçalho HTTP `Authorization`, usado pela maioria das APIs públicas (inclusive a própria OpenAI e Anthropic). O cliente envia:
+
+```
+Authorization: Bearer <token>
+```
+
+É o mesmo mecanismo por trás de JWT e OAuth2 — aqui usamos a versão mais simples, um token fixo, mas a forma de transporte é a mesma que você vai encontrar em produção.
+
+## 4.3 Implementando os dois — `auth/seguranca.py`
+
+```python
+"""
+Duas estratégias de autenticação para o mesmo endpoint:
+- X-API-Key (header customizado)
+- Authorization: Bearer <token>
+
+Qualquer uma das duas, se válida, libera o acesso.
+Isso é só para fins didáticos de comparação; em produção normalmente
+se escolhe UMA estratégia e se mantém consistente em toda a API.
+"""
+
+import os
+from fastapi import HTTPException, Security
+from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+
+API_KEY_VALIDA = os.getenv("API_KEY")
+BEARER_TOKEN_VALIDO = os.getenv("BEARER_TOKEN")
+
+# Declaram QUAL header o Swagger deve pedir e documentar automaticamente.
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def validar_credenciais(
+    api_key: str = Security(api_key_header),
+    bearer: HTTPAuthorizationCredentials = Security(bearer_scheme),
+):
+    """
+    Aceita autenticação por X-API-Key OU por Bearer Token.
+    auto_error=False em ambos os schemes evita que o FastAPI dispare
+    erro antes de checarmos as duas alternativas manualmente.
+    """
+    if api_key and api_key == API_KEY_VALIDA:
+        return "api_key"
+
+    if bearer and bearer.credentials == BEARER_TOKEN_VALIDO:
+        return "bearer_token"
+
+    raise HTTPException(status_code=401, detail="Credenciais inválidas ou ausentes")
+```
+
+```python
+# .env do backend
+GEMINI_API_KEY=chave_real_do_ai_studio
+API_KEY=minha-chave-secreta-aqui
+BEARER_TOKEN=um-token-fixo-para-fins-didaticos
+```
+
+## 4.4 O que NÃO fazer
+
+```python
+# NUNCA faça isso — a key/token fica exposta no código
 API_KEY = "abc123secreto"
 
 # NUNCA faça isso — vaza no histórico do git
@@ -238,85 +279,148 @@ requests.post(url, headers={"X-API-Key": "abc123secreto"})
 
 ---
 
-# 6. Centralizando as Chamadas de API
+# 5. Tratamento de Erros no Front — Protótipo vs. Produto
 
-Em projetos maiores, é boa prática centralizar todas as chamadas de API em um módulo separado — exatamente como fazíamos com os providers no semestre 1.
+Um front-end de produção nunca expõe erros técnicos diretamente para o usuário.
 
-```
-features/
-  analise/
-    page.py          ← interface Streamlit
-    pipeline.py      ← orquestra a lógica
-providers/
-  api_provider.py    ← todas as chamadas HTTP ficam aqui
-```
+| Situação | Status Code | O que o usuário deve ver |
+|----------|-------------|--------------------------|
+| Back-end fora do ar | Exceção de conexão | "Serviço temporariamente indisponível" |
+| Dados inválidos enviados | 422 | "Verifique a mensagem e tente novamente" |
+| Não autorizado | 401 | "Sessão expirada, faça login novamente" |
+| Erro ao consultar o modelo | 502 | "Não foi possível gerar a resposta agora" |
+| Erro interno do servidor | 500 | "Ocorreu um erro. Tente novamente em instantes" |
+
+---
+
+# 6. Centralizando as Chamadas — `providers/api_provider.py`
 
 ```python
-# providers/api_provider.py
+"""
+Todas as chamadas HTTP do front para o back ficam centralizadas aqui —
+exatamente como fazíamos com os providers de modelo no semestre 1.
+"""
+
 import requests
 import streamlit as st
 
 API_URL = st.secrets.get("API_URL", "http://localhost:8000")
 API_KEY = st.secrets.get("API_KEY", "")
+BEARER_TOKEN = st.secrets.get("BEARER_TOKEN", "")
 
-# Cabeçalhos padrão enviados em todas as requisições
+# Escolha da estratégia de autenticação usada pelo front.
+# Comente uma das duas linhas de _HEADERS para trocar de estratégia.
 _HEADERS = {
     "X-API-Key": API_KEY,
-    "Content-Type": "application/json"
+    # "Authorization": f"Bearer {BEARER_TOKEN}",
+    "Content-Type": "application/json",
 }
 
-def analisar_sentimento(texto: str) -> dict | None:
+
+def enviar_mensagem(mensagem: str, historico: list[dict]) -> str | None:
+    """
+    Envia a mensagem + histórico ao endpoint de chat.
+    `historico` já deve estar no formato [{"role": "user"|"model", "text": "..."}].
+    Retorna o texto da resposta ou None em caso de falha (erro já exibido via st.error).
+    """
     try:
         r = requests.post(
-            f"{API_URL}/v1/analise/sentimento",
-            json={"texto": texto},
+            f"{API_URL}/v1/chat/",
+            json={"mensagem": mensagem, "historico": historico},
             headers=_HEADERS,
-            timeout=10
-        )
-        r.raise_for_status()  # lança exceção para qualquer 4xx ou 5xx
-        return r.json()
-    except requests.HTTPError as e:
-        st.error(f"Erro da API: {e.response.status_code}")
-    except requests.ConnectionError:
-        st.error("Servidor indisponível.")
-    except requests.Timeout:
-        st.error("Tempo limite excedido.")
-    return None
-
-def listar_historico(pagina: int = 1) -> list | None:
-    try:
-        r = requests.get(
-            f"{API_URL}/v1/historico",
-            params={"pagina": pagina},
-            headers=_HEADERS,
-            timeout=10
+            timeout=30,  # respostas de chat podem demorar mais que uma classificação
         )
         r.raise_for_status()
-        return r.json()
-    except Exception:
-        st.error("Não foi possível carregar o histórico.")
+        return r.json()["resposta"]
+
+    except requests.HTTPError as e:
+        if e.response.status_code == 401:
+            st.error("Sessão expirada. Faça login novamente.")
+        elif e.response.status_code == 422:
+            st.warning("Mensagem inválida. Tente novamente.")
+        elif e.response.status_code == 502:
+            st.error("Não foi possível gerar a resposta agora.")
+        else:
+            st.error(f"Erro {e.response.status_code}.")
+    except requests.ConnectionError:
+        st.error("Não foi possível conectar ao servidor. Verifique se o back-end está rodando.")
+    except requests.Timeout:
+        st.error("A requisição demorou demais. Tente novamente.")
+
     return None
 ```
 
+```toml
+# .streamlit/secrets.toml do front  (nunca commitar esse arquivo)
+API_URL = "http://localhost:8000"
+API_KEY = "minha-chave-secreta-aqui"
+BEARER_TOKEN = "um-token-fixo-para-fins-didaticos"
+```
+
+---
+
+# 7. O Front-end: Chatbot com `st.chat_message` e `st.chat_input`
+
+O Streamlit tem componentes nativos para chat desde a versão 1.24: `st.chat_message` (renderiza uma bolha de fala) e `st.chat_input` (campo de digitação fixo na parte inferior da tela). Vamos usá-los junto com `st.session_state` para manter o histórico entre as interações — lembrando que o back-end é stateless, então **é o front que guarda e reenvia o histórico a cada mensagem**.
+
 ```python
-# features/analise/page.py
+# app.py
 import streamlit as st
 from providers import api_provider
 
-def render():
-    st.subheader("Análise de Texto")
-    texto = st.text_area("Texto:")
+st.set_page_config(page_title="Chat com IA", layout="centered")
+st.title("Chat com IA")
 
-    if st.button("Analisar") and texto:
-        with st.spinner("Processando..."):
-            resultado = api_provider.analisar_sentimento(texto)
+# session_state mantém o histórico vivo entre reruns do Streamlit,
+# mas SOMENTE enquanto a aba do navegador está aberta na mesma sessão.
+if "historico" not in st.session_state:
+    st.session_state.historico = []  # [{"role": "user"|"model", "text": "..."}]
 
-        if resultado:
-            st.metric("Sentimento", resultado["sentimento"])
-            st.metric("Confiança", f"{resultado['confianca']:.0%}")
+# Renderiza todo o histórico já existente a cada rerun da página
+for turno in st.session_state.historico:
+    papel_exibicao = "user" if turno["role"] == "user" else "assistant"
+    with st.chat_message(papel_exibicao):
+        st.markdown(turno["text"])
+
+# Campo de entrada fixo — dispara um rerun assim que o usuário envia
+mensagem = st.chat_input("Digite sua mensagem...")
+
+if mensagem:
+    # Mostra a mensagem do usuário imediatamente, sem esperar a API
+    with st.chat_message("user"):
+        st.markdown(mensagem)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Pensando..."):
+            # Envia o histórico ANTES de adicionar a mensagem atual —
+            # o back-end recebe o contexto e a mensagem nova separadamente
+            resposta = api_provider.enviar_mensagem(mensagem, st.session_state.historico)
+
+        if resposta:
+            st.markdown(resposta)
+
+    # Só persiste no histórico se a chamada deu certo — evita gravar
+    # uma mensagem do usuário sem a resposta correspondente do modelo
+    if resposta:
+        st.session_state.historico.append({"role": "user", "text": mensagem})
+        st.session_state.historico.append({"role": "model", "text": resposta})
 ```
 
-Esse padrão é direto: se você precisar trocar a URL da API, mudar o header de autenticação ou adicionar retry logic, você muda em um único lugar — o `api_provider.py`.
+O `st.spinner` continua sendo o detalhe de UX que sinaliza espera — a mesma **Gestão de Expectativa e Incerteza** da Aula 02 do semestre 1, agora aplicada a uma conversa inteira em vez de uma única análise.
+
+---
+
+# 8. Rodando Front e Back Juntos
+
+```bash
+# Terminal 1 — back-end
+uvicorn main:app --reload --port 8000
+
+# Terminal 2 — front-end
+streamlit run app.py
+```
+
+Acesse `http://localhost:8000/docs` para testar o `/v1/chat/` isoladamente pelo Swagger (informando o header de autenticação escolhido) antes de testar pelo chat do Streamlit.
 
 ---
 
@@ -324,5 +428,7 @@ Esse padrão é direto: se você precisar trocar a URL da API, mudar o header de
 
 - [Requests — Documentação](https://requests.readthedocs.io)
 - [FastAPI — Security](https://fastapi.tiangolo.com/tutorial/security/)
+- [FastAPI — HTTPBearer](https://fastapi.tiangolo.com/reference/security/#fastapi.security.HTTPBearer)
+- [Streamlit — Chat elements (`st.chat_message`, `st.chat_input`)](https://docs.streamlit.io/develop/api-reference/chat)
 - [Streamlit Secrets Management](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/secrets-management)
 - [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
