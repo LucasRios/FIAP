@@ -84,7 +84,10 @@ Isolado do FastAPI: pode ser testado ou reaproveitado sem nenhum router.
 
 import os
 from google import genai
+from dotenv import load_dotenv
 from google.genai import types
+
+load_dotenv() 
 
 MODELO = "gemini-3.5-flash"
 
