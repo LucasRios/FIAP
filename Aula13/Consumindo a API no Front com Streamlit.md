@@ -171,6 +171,12 @@ from auth.seguranca import validar_credenciais
 
 router = APIRouter()
 
+#router = APIRouter(dependencies=[Depends(validar_credenciais)])
+
+#@router.post("/", response_model=SaidaChat)
+#async def conversar(entrada: EntradaChat):
+#    ...
+
 
 @router.post("/", response_model=SaidaChat)
 async def conversar(entrada: EntradaChat, _=Depends(validar_credenciais)):
@@ -191,7 +197,21 @@ async def conversar(entrada: EntradaChat, _=Depends(validar_credenciais)):
 from fastapi import FastAPI
 from routers import chat
 
+#app = FastAPI(
+#    title="API de Chat com IA",
+#    version="1.0.0",
+#    dependencies=[Depends(validar_credenciais)]
+#)
+
+
 app = FastAPI(title="API de Chat com IA", version="1.0.0")
+
+#app.include_router(
+#    chat.router,
+#    prefix="/v1/chat",
+#    tags=["Chat"],
+#    dependencies=[Depends(validar_credenciais)])
+
 
 app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
 ```
