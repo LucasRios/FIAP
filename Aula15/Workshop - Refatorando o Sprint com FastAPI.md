@@ -1046,28 +1046,6 @@ Roteiro de verificação:
 
 ---
 
-# 5. Roteiro Sugerido por Encontro
-
-Este workshop não cabe em uma aula só. Sugestão de divisão:
-
-**Encontro 1 — Back-end**
-- Diagnóstico da arquitetura atual (Seção 1 e 2 deste documento).
-- Criar `backend/` completo: `models/`, `providers/` (copiados), `auth/seguranca.py`, `routers/`, `main.py`.
-- Subir o Uvicorn e validar 100% pelo Swagger — sem tocar no front ainda.
-
-**Encontro 2 — Front-end**
-- Criar `providers/api_provider.py`.
-- Atualizar os três `pipelines/*.py` e os imports diretos nas `features/*.py`.
-- Rodar os dois processos juntos e validar o fluxo ponta a ponta (Seção 3).
-
-**Encontro 3 (opcional) — Segurança e exercícios**
-- Trocar a `API_KEY` fixa por rotação/hash.
-- Adicionar rate limiting básico.
-- Exercício: expor `GET /v1/sensores/limites` e remover a duplicação de constantes citada em `dashboard_pipeline.py`.
-- Exercício: persistir de verdade o "Registrar Ocorrência" da página de Sensores — hoje ele só simula (`_registrar` em `features/sensores/page.py`), criar tabela `ocorrencias` no back-end e um endpoint `POST /v1/sensores/{tag}/ocorrencias`.
-
----
-
 # Referências
 
 - [python-dotenv](https://saurabh-kumar.com/python-dotenv/)
