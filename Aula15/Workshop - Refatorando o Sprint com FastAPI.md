@@ -8,7 +8,7 @@ Esta aula é densa de propósito — o conteúdo deve render mais de um encontro
 
 # 1. O Ponto de Partida — a arquitetura real do Sprint
 
-Esqueça exemplos genéricos de "análise de notícias". O projeto que vocês têm em mãos (pasta `sprint_antiga/`) é este:
+O projeto que vocês têm em mãos (pasta `sprint_antiga/`) é este:
 
 ```
 app.py (Gradio)
