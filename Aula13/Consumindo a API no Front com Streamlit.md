@@ -338,48 +338,279 @@ Um front-end de produção nunca expõe erros técnicos diretamente para o usuá
 
 ---
 
-# 6. Centralizando as Chamadas — `providers/api_provider.py`
+# 6. Evoluindo a Autenticação para Bearer Token
+
+Até aqui o `BEARER_TOKEN` era só uma string fixa no `.env`, comparada com `==`. Funciona, mas não é um JWT de verdade — é uma API Key disfarçada de Bearer Token, sem nenhuma das vantagens reais do padrão: expiração automática, claims (identidade de quem fez login) e validação sem depender de um valor fixo compartilhado.
+
+Vamos evoluir para um **JWT (JSON Web Token)** de verdade:
+
+```
+header.payload.signature
+```
+
+- **header**: algoritmo usado (`HS256`)
+- **payload**: claims — `sub` (usuário), `iat` (quando foi emitido), `exp` (quando expira)
+- **signature**: `HMACSHA256(header + "." + payload, JWT_SECRET)` — garante que ninguém alterou o conteúdo sem saber o segredo
+
+A diferença prática: em vez de todo cliente carregar o mesmo token fixo para sempre, o back-end passa a ter um **endpoint de login** que gera um token novo, assinado, com prazo de validade. O front chama esse endpoint uma vez, guarda o token, e reenvia em cada requisição até ele expirar.
+
+## 6.1 O que muda na estrutura de projeto
+
+```
+meu_projeto_backend/
+├── main.py
+├── routers/
+│   ├── chat.py
+│   └── login.py               ← NOVO — endpoint /v1/login
+├── models/
+│   ├── entrada.py
+│   ├── saida.py
+│   └── login.py                ← NOVO — Pydantic do login
+├── providers/
+│   └── gemini_provider.py
+├── auth/
+│   └── seguranca.py            ← ALTERADO — agora gera e valida JWT
+├── .env                         ← ALTERADO
+└── requirements.txt              ← ALTERADO — adiciona pyjwt
+```
+
+## 6.2 Dependência nova
+
+```bash
+pip install pyjwt
+```
+
+```
+# requirements.txt
+fastapi
+uvicorn
+google-genai
+python-dotenv
+pyjwt
+```
+
+## 6.3 `.env` — trocando `BEARER_TOKEN` fixo por `JWT_SECRET`
+
+```python
+# .env do backend
+GEMINI_API_KEY=chave_real_do_ai_studio
+API_KEY=minha-chave-secreta-aqui
+
+# antes: BEARER_TOKEN=um-token-fixo-para-fins-didaticos
+# agora: um segredo usado para ASSINAR os tokens, não um token em si
+JWT_SECRET=troque-por-uma-string-longa-e-aleatoria
+
+# usuário fixo só para fins didáticos — em produção viria de um banco com senha com hash (bcrypt/argon2)
+APP_USER=aluno
+APP_PASSWORD=1234
+```
+
+O `gerar_chave.py` da seção anterior continua útil — use `token_urlsafe(32)` para gerar o `JWT_SECRET`.
+
+## 6.4 `models/login.py` — contrato do login
+
+```python
+"""Pydantic do endpoint de login."""
+
+from pydantic import BaseModel
+
+
+class LoginRequest(BaseModel):
+    usuario: str
+    senha: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+```
+
+## 6.5 `auth/seguranca.py` — de token fixo para JWT real
 
 ```python
 """
-Todas as chamadas HTTP do front para o back ficam centralizadas aqui —
-exatamente como fazíamos com os providers de modelo no semestre 1.
+Duas estratégias de autenticação para o mesmo endpoint:
+- X-API-Key (header customizado, string fixa — inalterado)
+- Authorization: Bearer <token> (agora um JWT gerado no login, não mais fixo)
+
+Qualquer uma das duas, se válida, libera o acesso.
+"""
+
+import os
+from datetime import datetime, timedelta, timezone
+
+import jwt
+from fastapi import HTTPException, Security
+from fastapi.security import APIKeyHeader, HTTPBearer, HTTPAuthorizationCredentials
+
+API_KEY_VALIDA = os.getenv("API_KEY")
+JWT_SECRET = os.getenv("JWT_SECRET")
+ALGORITHM = "HS256"
+EXPIRA_MINUTOS = 60
+
+USUARIO_VALIDO = os.getenv("APP_USER")
+SENHA_VALIDA = os.getenv("APP_PASSWORD")
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
+
+
+def gerar_token(usuario: str) -> str:
+    """
+    NOVO. Cria o JWT assinado com HS256, usado pelo endpoint de login.
+    exp faz o token expirar sozinho — sem precisar de blacklist manual.
+    """
+    agora = datetime.now(timezone.utc)
+    payload = {
+        "sub": usuario,
+        "iat": agora,
+        "exp": agora + timedelta(minutes=EXPIRA_MINUTOS),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM)
+
+
+def autenticar_usuario(usuario: str, senha: str) -> bool:
+    """NOVO. Checagem simples de credenciais — usada só pelo /v1/login."""
+    return usuario == USUARIO_VALIDO and senha == SENHA_VALIDA
+
+
+def validar_credenciais(
+    api_key: str = Security(api_key_header),
+    bearer: HTTPAuthorizationCredentials = Security(bearer_scheme),
+):
+    """
+    ALTERADO: a checagem do Bearer não é mais `bearer.credentials == BEARER_TOKEN_VALIDO`.
+    Agora decodifica o JWT e valida assinatura + expiração via jwt.decode.
+    """
+    if api_key and api_key == API_KEY_VALIDA:
+        return "api_key"
+
+    if bearer:
+        try:
+            payload = jwt.decode(bearer.credentials, JWT_SECRET, algorithms=[ALGORITHM])
+            return payload["sub"]
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=401, detail="Token expirado")
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+    raise HTTPException(status_code=401, detail="Credenciais inválidas ou ausentes")
+```
+
+## 6.6 `routers/login.py` — NOVO endpoint
+
+```python
+from fastapi import APIRouter, HTTPException
+
+from models.login import LoginRequest, LoginResponse
+from auth.seguranca import autenticar_usuario, gerar_token
+
+router = APIRouter()
+
+
+@router.post("/", response_model=LoginResponse)
+def login(dados: LoginRequest):
+    """Valida usuário/senha e devolve um JWT novo, válido por EXPIRA_MINUTOS."""
+    if not autenticar_usuario(dados.usuario, dados.senha):
+        raise HTTPException(status_code=401, detail="Usuário ou senha inválidos")
+
+    return LoginResponse(access_token=gerar_token(dados.usuario))
+```
+
+## 6.7 `main.py` — registrando o novo router
+
+```python
+from fastapi import FastAPI
+from routers import chat, login   # login adicionado
+
+app = FastAPI(title="API de Chat com IA", version="1.0.0")
+
+app.include_router(login.router, prefix="/v1/login", tags=["Login"])   # NOVO
+app.include_router(chat.router, prefix="/v1/chat", tags=["Chat"])
+```
+
+`routers/chat.py` **não muda** — `validar_credenciais` continua sendo a mesma dependency injetada, só o que acontece dentro dela mudou.
+
+---
+
+# 7. O Front-end: Chatbot com Login e Bearer Token (JWT)
+
+Antes o front só carregava um `BEARER_TOKEN` fixo do `secrets.toml`. Agora ele precisa **fazer login primeiro**, guardar o token retornado em `st.session_state`, e reenviá-lo em cada chamada — tratando também o caso de token expirado.
+
+## 7.1 `.streamlit/secrets.toml` do front
+
+```toml
+API_URL = "http://localhost:8000"
+
+# credenciais de login, não mais um token fixo
+APP_USER = "aluno"
+APP_PASSWORD = "1234"
+```
+
+## 7.2 `providers/api_provider.py` — com login e token dinâmico
+
+```python
+"""
+Todas as chamadas HTTP do front para o back ficam centralizadas aqui.
+Agora inclui a função de login, que obtém o JWT usado nas chamadas seguintes.
 """
 
 import requests
 import streamlit as st
 
 API_URL = st.secrets.get("API_URL", "http://localhost:8000")
-API_KEY = st.secrets.get("API_KEY", "")
-BEARER_TOKEN = st.secrets.get("BEARER_TOKEN", "")
 
-# Escolha da estratégia de autenticação usada pelo front.
-# Comente uma das duas linhas de _HEADERS para trocar de estratégia.
-_HEADERS = {
-    "X-API-Key": API_KEY,
-    # "Authorization": f"Bearer {BEARER_TOKEN}",
-    "Content-Type": "application/json",
-}
+
+def login(usuario: str, senha: str) -> bool:
+    """
+    NOVO. Autentica no back-end e guarda o JWT em st.session_state.
+    Retorna True se o login deu certo.
+    """
+    try:
+        r = requests.post(
+            f"{API_URL}/v1/login/",
+            json={"usuario": usuario, "senha": senha},
+            timeout=10,
+        )
+        r.raise_for_status()
+        st.session_state.access_token = r.json()["access_token"]
+        return True
+    except requests.HTTPError:
+        st.error("Usuário ou senha inválidos.")
+    except requests.ConnectionError:
+        st.error("Não foi possível conectar ao servidor.")
+    return False
 
 
 def enviar_mensagem(mensagem: str, historico: list[dict]) -> str | None:
     """
-    Envia a mensagem + histórico ao endpoint de chat.
-    `historico` já deve estar no formato [{"role": "user"|"model", "text": "..."}].
-    Retorna o texto da resposta ou None em caso de falha (erro já exibido via st.error).
+    ALTERADO: o header Authorization agora usa o token guardado na sessão
+    (obtido no login), não mais um valor fixo do secrets.toml.
     """
+    token = st.session_state.get("access_token")
+    if not token:
+        st.error("Faça login antes de enviar mensagens.")
+        return None
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
     try:
         r = requests.post(
             f"{API_URL}/v1/chat/",
             json={"mensagem": mensagem, "historico": historico},
-            headers=_HEADERS,
-            timeout=30,  # respostas de chat podem demorar mais que uma classificação
+            headers=headers,
+            timeout=30,
         )
         r.raise_for_status()
         return r.json()["resposta"]
 
     except requests.HTTPError as e:
         if e.response.status_code == 401:
+            # ALTERADO: token expirado — limpa a sessão e força novo login
+            st.session_state.access_token = None
             st.error("Sessão expirada. Faça login novamente.")
         elif e.response.status_code == 422:
             st.warning("Mensagem inválida. Tente novamente.")
@@ -395,18 +626,7 @@ def enviar_mensagem(mensagem: str, historico: list[dict]) -> str | None:
     return None
 ```
 
-```toml
-# .streamlit/secrets.toml do front  (nunca commitar esse arquivo)
-API_URL = "http://localhost:8000"
-API_KEY = "minha-chave-secreta-aqui"
-BEARER_TOKEN = "um-token-fixo-para-fins-didaticos"
-```
-
----
-
-# 7. O Front-end: Chatbot com `st.chat_message` e `st.chat_input`
-
-O Streamlit tem componentes nativos para chat desde a versão 1.24: `st.chat_message` (renderiza uma bolha de fala) e `st.chat_input` (campo de digitação fixo na parte inferior da tela). Vamos usá-los junto com `st.session_state` para manter o histórico entre as interações — lembrando que o back-end é stateless, então **é o front que guarda e reenvia o histórico a cada mensagem**.
+## 7.3 `app.py` — tela de login antes do chat
 
 ```python
 # app.py
@@ -416,46 +636,50 @@ from providers import api_provider
 st.set_page_config(page_title="Chat com IA", layout="centered")
 st.title("Chat com IA")
 
-# session_state mantém o histórico vivo entre reruns do Streamlit,
-# mas SOMENTE enquanto a aba do navegador está aberta na mesma sessão.
 if "historico" not in st.session_state:
     st.session_state.historico = []  # [{"role": "user"|"model", "text": "..."}]
 
-# Renderiza todo o histórico já existente a cada rerun da página
+if "access_token" not in st.session_state:
+    st.session_state.access_token = None
+
+# NOVO: sem token, mostra formulário de login e para por aqui
+if not st.session_state.access_token:
+    st.subheader("Login")
+    with st.form("login_form"):
+        usuario = st.text_input("Usuário")
+        senha = st.text_input("Senha", type="password")
+        entrar = st.form_submit_button("Entrar")
+
+    if entrar and api_provider.login(usuario, senha):
+        st.rerun()
+
+    st.stop()  # impede o restante da página de renderizar sem estar logado
+
+# a partir daqui, o resto do chat é idêntico ao da seção 7 original
 for turno in st.session_state.historico:
     papel_exibicao = "user" if turno["role"] == "user" else "assistant"
     with st.chat_message(papel_exibicao):
         st.markdown(turno["text"])
 
-# Campo de entrada fixo — dispara um rerun assim que o usuário envia
 mensagem = st.chat_input("Digite sua mensagem...")
 
 if mensagem:
-    # Mostra a mensagem do usuário imediatamente, sem esperar a API
     with st.chat_message("user"):
         st.markdown(mensagem)
 
     with st.chat_message("assistant"):
         with st.spinner("Pensando..."):
-            # Envia o histórico ANTES de adicionar a mensagem atual —
-            # o back-end recebe o contexto e a mensagem nova separadamente
             resposta = api_provider.enviar_mensagem(mensagem, st.session_state.historico)
 
         if resposta:
             st.markdown(resposta)
 
-    # Só persiste no histórico se a chamada deu certo — evita gravar
-    # uma mensagem do usuário sem a resposta correspondente do modelo
     if resposta:
         st.session_state.historico.append({"role": "user", "text": mensagem})
         st.session_state.historico.append({"role": "model", "text": resposta})
 ```
 
-O `st.spinner` continua sendo o detalhe de UX que sinaliza espera — a mesma **Gestão de Expectativa e Incerteza** da Aula 02 do semestre 1, agora aplicada a uma conversa inteira em vez de uma única análise.
-
----
-
-# 8. Rodando Front e Back Juntos
+## 7.4 Testando
 
 ```bash
 # Terminal 1 — back-end
@@ -465,7 +689,8 @@ uvicorn main:app --reload --port 8000
 streamlit run app.py
 ```
 
-Acesse `http://localhost:8000/docs` para testar o `/v1/chat/` isoladamente pelo Swagger (informando o header de autenticação escolhido) antes de testar pelo chat do Streamlit.
+No Swagger (`http://localhost:8000/docs`), chame `POST /v1/login/` primeiro para obter o token, clique em **Authorize** e cole `Bearer <token>` para testar `/v1/chat/` isoladamente — só então vale testar pelo Streamlit.
+
 
 ---
 
