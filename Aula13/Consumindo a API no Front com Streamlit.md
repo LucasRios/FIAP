@@ -340,21 +340,42 @@ Um front-end de produção nunca expõe erros técnicos diretamente para o usuá
 
 # 6. Evoluindo a Autenticação para Bearer Token
 
+## 6.0 JWT Bearer Token vs API Key
+
+### Conceitos
+
+**API Key**: string estática, opaca, sem estrutura. O servidor apenas compara com um valor armazenado (banco/config).
+
+**JWT (JSON Web Token)**: token auto-contido, estruturado em 3 partes (`header.payload.signature`), assinado criptograficamente. O servidor valida a assinatura sem precisar consultar banco de dados a cada request.
+
+### Estrutura do JWT
+
+```
+eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3MDAwMDAwMDB9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+```
+
+- **Header**: algoritmo (`{"alg":"HS256","typ":"JWT"}`)
+- **Payload**: claims (`sub`, `role`, `exp`, dados customizados) — **não é criptografado, só codificado em Base64**
+- **Signature**: `HMACSHA256(base64(header) + "." + base64(payload), secret)`
+
+### Diferenças práticas
+
+| | API Key | JWT |
+|---|---|---|
+| Conteúdo | Opaco (só um ID) | Auto-contido (carrega claims) |
+| Validação | Consulta ao banco a cada request | Verifica assinatura localmente (stateless) |
+| Expiração | Manual (revogar no banco) | Nativa (`exp` claim) |
+| Revogação antes do prazo | Fácil (deleta do banco) | Difícil (precisa blacklist) |
+| Uso típico | Server-to-server, integrações simples | Autenticação de usuário, sessões |
+| Tamanho | Curto | Maior (carrega payload) |
+
+## 6.1 Da versão didática para a versão real
+
 Até aqui o `BEARER_TOKEN` era só uma string fixa no `.env`, comparada com `==`. Funciona, mas não é um JWT de verdade — é uma API Key disfarçada de Bearer Token, sem nenhuma das vantagens reais do padrão: expiração automática, claims (identidade de quem fez login) e validação sem depender de um valor fixo compartilhado.
 
-Vamos evoluir para um **JWT (JSON Web Token)** de verdade:
+Vamos evoluir para um JWT de verdade: em vez de todo cliente carregar o mesmo token fixo para sempre, o back-end passa a ter um **endpoint de login** que gera um token novo, assinado, com prazo de validade (`exp`). O front chama esse endpoint uma vez, guarda o token, e reenvia em cada requisição até ele expirar.
 
-```
-header.payload.signature
-```
-
-- **header**: algoritmo usado (`HS256`)
-- **payload**: claims — `sub` (usuário), `iat` (quando foi emitido), `exp` (quando expira)
-- **signature**: `HMACSHA256(header + "." + payload, JWT_SECRET)` — garante que ninguém alterou o conteúdo sem saber o segredo
-
-A diferença prática: em vez de todo cliente carregar o mesmo token fixo para sempre, o back-end passa a ter um **endpoint de login** que gera um token novo, assinado, com prazo de validade. O front chama esse endpoint uma vez, guarda o token, e reenvia em cada requisição até ele expirar.
-
-## 6.1 O que muda na estrutura de projeto
+## 6.2 O que muda na estrutura de projeto
 
 ```
 meu_projeto_backend/
@@ -374,7 +395,7 @@ meu_projeto_backend/
 └── requirements.txt              ← ALTERADO — adiciona pyjwt
 ```
 
-## 6.2 Dependência nova
+## 6.3 Dependência nova
 
 ```bash
 pip install pyjwt
@@ -389,7 +410,7 @@ python-dotenv
 pyjwt
 ```
 
-## 6.3 `.env` — trocando `BEARER_TOKEN` fixo por `JWT_SECRET`
+## 6.4 `.env` — trocando `BEARER_TOKEN` fixo por `JWT_SECRET`
 
 ```python
 # .env do backend
@@ -407,7 +428,7 @@ APP_PASSWORD=1234
 
 O `gerar_chave.py` da seção anterior continua útil — use `token_urlsafe(32)` para gerar o `JWT_SECRET`.
 
-## 6.4 `models/login.py` — contrato do login
+## 6.5 `models/login.py` — contrato do login
 
 ```python
 """Pydantic do endpoint de login."""
@@ -425,7 +446,7 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
 ```
 
-## 6.5 `auth/seguranca.py` — de token fixo para JWT real
+## 6.6 `auth/seguranca.py` — de token fixo para JWT real
 
 ```python
 """
@@ -497,7 +518,7 @@ def validar_credenciais(
     raise HTTPException(status_code=401, detail="Credenciais inválidas ou ausentes")
 ```
 
-## 6.6 `routers/login.py` — NOVO endpoint
+## 6.7 `routers/login.py` — NOVO endpoint
 
 ```python
 from fastapi import APIRouter, HTTPException
@@ -517,7 +538,7 @@ def login(dados: LoginRequest):
     return LoginResponse(access_token=gerar_token(dados.usuario))
 ```
 
-## 6.7 `main.py` — registrando o novo router
+## 6.8 `main.py` — registrando o novo router
 
 ```python
 from fastapi import FastAPI
@@ -690,6 +711,7 @@ streamlit run app.py
 ```
 
 No Swagger (`http://localhost:8000/docs`), chame `POST /v1/login/` primeiro para obter o token, clique em **Authorize** e cole `Bearer <token>` para testar `/v1/chat/` isoladamente — só então vale testar pelo Streamlit.
+
 
 
 ---
