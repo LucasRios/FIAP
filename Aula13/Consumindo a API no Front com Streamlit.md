@@ -373,6 +373,21 @@ eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMiLCJyb2xlIjoiYWRtaW4iLCJleHAiOjE3MDAwMDAwMDB
 
 Até aqui o `BEARER_TOKEN` era só uma string fixa no `.env`, comparada com `==`. Funciona, mas não é um JWT de verdade — é uma API Key disfarçada de Bearer Token, sem nenhuma das vantagens reais do padrão: expiração automática, claims (identidade de quem fez login) e validação sem depender de um valor fixo compartilhado.
 
+
+O payload do JWT (header.payload) é só Base64 — qualquer um decodifica e lê. A signature é HMAC-SHA256(header+payload, JWT_SECRET). Ela não esconde nada, só prova que quem gerou o token conhecia o JWT_SECRET. Se alguém alterar o payload (ex: trocar role: user por role: admin), a assinatura não bate mais e jwt.decode() rejeita.
+
+2. Se alguém rouba o token, sim, ele consegue usar — até expirar.
+Isso é a natureza de qualquer "bearer token": quem porta (bearer) o token é tratado como autenticado, sem prova adicional de identidade. Não tem como o servidor diferenciar "o usuário legítimo" de "alguém que roubou o token" — a validação é só sobre a assinatura ser válida.
+
+A estratégia não é "expirar a chave". O JWT_SECRET continua o mesmo (ele fica só no servidor, nunca é exposto — o atacante rouba o token, não o secret). Quem expira é o próprio token, via claim exp que já está no payload:
+A cada request, jwt.decode() confere exp contra o horário atual. Passou, ExpiredSignatureError — mesmo com assinatura perfeitamente válida.
+
+Isso limita a janela de exposição, mas não zera o risco: se o token for roubado nos primeiros 59 minutos de uma validade de 60, ainda dá pra usar. Por isso, na prática:
+
+Tempo curto de expiração (minutos, não dias) — o único mecanismo nativo do JWT.
+HTTPS sempre — o risco maior é o token ser interceptado em trânsito.
+Revogação antes do prazo é difícil por natureza (é a linha da tabela que já vimos) — se precisar de logout imediato ou banir um usuário no meio da validade, a solução comum é manter uma blacklist de tokens revogados no servidor (perde parte do "stateless"), ou usar o padrão refresh token: um access token JWT de vida curta (minutos) + um refresh token de vida mais longa guardado no servidor, que pode ser revogado a qualquer momento.
+
 Vamos evoluir para um JWT de verdade: em vez de todo cliente carregar o mesmo token fixo para sempre, o back-end passa a ter um **endpoint de login** que gera um token novo, assinado, com prazo de validade (`exp`). O front chama esse endpoint uma vez, guarda o token, e reenvia em cada requisição até ele expirar.
 
 ## 6.2 O que muda na estrutura de projeto
