@@ -2,7 +2,7 @@
 
 Pegar o projeto real do Sprint — **Forzy · Digital Twin**, um app Gradio que lê e grava dados de motores industriais direto num banco SQLite — e separar essa lógica em um back-end FastAPI de verdade. O front-end (Gradio) deixa de acessar banco de dados e passa a consumir tudo via HTTP. Aplicamos segurança real com variáveis de ambiente e proteção de rotas por API Key.
 
-Esta aula é densa de propósito — o conteúdo deve render mais de um encontro. No fim do documento há uma sugestão de como dividir o trabalho entre encontros.
+Esta aula é densa de propósito — o conteúdo deve render mais de um encontro. 
 
 ---
 
