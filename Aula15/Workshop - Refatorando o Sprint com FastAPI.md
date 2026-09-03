@@ -529,6 +529,28 @@ def historico(tag: str, n: int = 48, _: str = Security(verificar_chave)):
 
 ## 1.5 `main.py` — juntando tudo
 
+CORS (Cross-Origin Resource Sharing) é o mecanismo que o navegador usa para decidir se uma página em uma origem (domínio+porta+protocolo) pode fazer requisições a uma API rodando em outra origem.
+
+Por que existe: por padrão, navegadores bloqueiam requisições JS entre origens diferentes (same-origin policy), pra evitar que um site malicioso faça chamadas em nome do usuário para outra API sem permissão.
+
+Fluxo com preflight (OPTIONS)
+
+Se a requisição usa Content-Type: application/json, headers customizados, ou métodos como PUT/DELETE, o browser não manda a requisição real direto — ele primeiro "pergunta":
+
+- Browser envia um OPTIONS automático (você nunca escreve esse código) com headers Access-Control-Request-Method e Access-Control-Request-Headers.
+- CORSMiddleware responde esse OPTIONS com os headers permitidos: Access-Control-Allow-Origin, Access-Control-Allow-Methods, Access-Control-Allow-Headers.
+- Browser compara: o método que ele quer usar está em allow_methods? O header que ele quer mandar está em allow_headers? A origem está em allow_origins?
+- Se tudo bater → browser manda a requisição real (POST de fato, com o JSON no corpo).
+- Se algo não bater → browser nem envia a requisição real. Erro aparece só no console do JS.
+
+Ponto chave: a API sempre processa e responde (o servidor não sabe nem se importa com CORS). Quem bloqueia é o browser, depois do fato, ao decidir se entrega a resposta pro código JS que chamou.
+
+allow_origins: whitelist de origens que podem consumir essa API via browser. Aqui, só localhost:7860 (onde o Gradio está rodando) tem permissão — se outra origem tentar chamar, o navegador bloqueia a resposta antes de entregar ao JS.
+allow_methods: restringe os verbos HTTP aceitos em requisições cross-origin.
+allow_headers=["*"]: libera qualquer header customizado na requisição.
+
+Ponto importante: CORS é aplicado pelo navegador, não pela API. Um curl ou requests.post() do Python ignora CORS completamente — ele só entra em ação quando o código roda dentro de um browser (JS fazendo fetch/XMLHttpRequest). O middleware apenas adiciona os headers (Access-Control-Allow-Origin, etc.) na resposta, e é o browser do cliente que decide bloquear ou não.
+
 ```python
 # backend/main.py
 from dotenv import load_dotenv
