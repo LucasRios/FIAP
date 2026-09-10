@@ -10,7 +10,7 @@ Entender o que acontece depois que o usuário clica "Enviar" e por que essa cama
 
 Imagine este cenário: seu app está em produção. Os usuários reclamam que "a IA às vezes retorna respostas sem sentido". Você abre o código e não vê nenhum erro. O app não quebra. Os logs mostram `200 OK`. O que está errado?
 
-Esse é o núcleo do problema: uma aplicação de IA pode estar tecnicamente saudável — API respondendo, banco funcionando, front-end renderizando normalmente — e ainda assim estar funcionalmente errada. O `200 OK` te diz que a requisição foi processada, mas não te diz se o conteúdo daquela resposta faz sentido. Entre o clique do usuário e o texto que aparece na tela existe um pipeline com várias etapas — construção de prompt, chamada ao modelo, parsing da resposta, validação — e qualquer uma delas pode falhar silenciosamente sem gerar uma exceção.
+Esse é o núcleo do problema: uma aplicação de IA com API pode estar tecnicamente saudável e ainda assim estar funcionalmente errada. O `200 OK` te diz que a requisição foi processada, mas não te diz se o conteúdo daquela resposta faz sentido. Entre o clique do usuário e o texto que aparece na tela existe um pipeline com várias etapas — construção de prompt, chamada ao modelo, parsing da resposta, validação — e qualquer uma delas pode falhar silenciosamente sem gerar uma exceção.
 
 É aqui que a diferença entre logging tradicional e observabilidade fica clara. Logging tradicional (aquele `logging.info(...)` espalhado pelo código) registra que um evento aconteceu, mas não registra *como* ele aconteceu. Um log como `"Resultado: positivo"` confirma que a função rodou até o fim, mas não guarda o texto exato que o usuário enviou, o prompt completo que foi montado a partir dele, qual modelo respondeu, quanto tempo a chamada levou ou quantos tokens foram consumidos. Se um usuário reclamar que a classificação de sentimento veio errada amanhã, esse log sozinho não ajuda a investigar nada — ele só prova que a função foi chamada.
 
@@ -20,9 +20,33 @@ Observabilidade resolve exatamente essa lacuna: em vez de uma linha de texto sol
 
 # 2. O Que Observar e Por Que Isso é Assunto de Front-end
 
-Nem toda informação tem o mesmo valor para investigar um problema, então vale organizar o que faz sentido capturar em quatro grupos. Do lado da entrada, importa guardar o texto original que o usuário digitou, o prompt completo que foi efetivamente enviado ao modelo (já com contexto, system prompt e exemplos incluídos) e características básicas do input, como idioma e tamanho. Do lado da execução, o que mais importa é saber qual modelo respondeu (`gemini-2.0-flash`, `claude-haiku-4-5`, `gpt-4o`...), quanto tempo cada etapa do pipeline levou e quantos tokens de entrada e saída foram consumidos — isso é o que permite responder "por que ficou lento?" ou "quanto essa chamada custou?". Do lado da saída, vale guardar tanto a resposta bruta do modelo quanto a resposta já processada (depois de parsing e validação), porque divergências entre as duas costumam ser exatamente onde o bug mora. E por fim, do lado do usuário, informações como um id de sessão anonimizado e feedback explícito (like/dislike) fecham o quadro, porque conectam a execução técnica com a percepção real de quem usou o produto.
+Nem toda informação tem o mesmo valor para investigar um problema, então vale organizar o que faz sentido capturar em quatro grupos. 
 
-Esse último grupo é o motivo pelo qual observabilidade não é assunto exclusivo do back-end. O back-end sabe o que aconteceu *dentro* do pipeline, mas o front-end sabe coisas que o back-end nunca vê sozinho: quanto tempo o usuário ficou olhando para a resposta antes de agir, se ele deu like ou dislike, se ele reformulou a pergunta logo em seguida (um sinal forte de que a resposta anterior foi ruim) e em que parte da interface ele clicou depois. Além de observar esse comportamento, o front-end também **controla** informações que viajam junto de cada requisição — o id de sessão, a versão do app, qual feature disparou a chamada — e que, se chegarem até a ferramenta de observabilidade, permitem cruzar "o que o modelo fez" com "o que o usuário sentiu sobre isso".
+Do lado da entrada:
+- o texto original que o usuário digitou
+- o prompt completo que foi efetivamente enviado ao modelo (já com contexto, system prompt e exemplos incluídos)
+- características básicas do input, como idioma e tamanho.
+
+Do lado da execução:
+- modelo respondeu
+- quanto tempo cada etapa do pipeline levou
+- quantos tokens de entrada e saída foram consumidos
+
+Do lado da saída: 
+- resposta bruta do modelo 
+- resposta já processada (depois de parsing e validação)
+
+Do lado do usuário:
+- informações como um id de sessão anonimizado
+- feedback explícito (like/dislike)
+
+Esse último grupo é o motivo pelo qual observabilidade não é assunto exclusivo do back-end. O back-end sabe o que aconteceu *dentro* do pipeline, mas o front-end sabe coisas que o back-end nunca vê sozinho: 
+- quanto tempo o usuário ficou olhando para a resposta antes de agir
+- se ele deu like ou dislike
+- se ele reformulou a pergunta logo em seguida (um sinal forte de que a resposta anterior foi ruim) 
+- em que parte da interface ele clicou depois.
+
+Além de observar esse comportamento, o front-end também **controla** informações que viajam junto de cada requisição — o id de sessão, a versão do app, qual feature disparou a chamada — e que, se chegarem até a ferramenta de observabilidade, permitem cruzar "o que o modelo fez" com "o que o usuário sentiu sobre isso".
 
 Na prática, isso significa enriquecer cada chamada HTTP com metadados de contexto:
 
@@ -59,7 +83,9 @@ O back-end recebe esses headers e os inclui nos traces de observabilidade como `
 
 ## 3.1 O que é e por que ele existe
 
-O LangSmith é a plataforma de observabilidade criada pela equipe do LangChain. Ele nasceu para resolver exatamente o problema da seção 1: aplicações de IA têm pipelines com várias etapas (prompt → modelo → parsing → validação) e, sem instrumentação, um desenvolvedor não tem como saber em qual etapa uma resposta ruim foi gerada. O LangSmith se conecta ao seu código, captura automaticamente cada chamada relevante, monta a árvore de execução completa (o **trace**) e expõe tudo em um dashboard web.
+O LangSmith é a plataforma de observabilidade criada pela equipe do LangChain. Ele nasceu para resolver exatamente o problema de observabilidade em sistemas de IA: aplicações de IA têm pipelines com várias etapas (prompt → modelo → parsing → validação) e, sem instrumentação, um desenvolvedor não tem como saber em qual etapa uma resposta ruim foi gerada. 
+
+O LangSmith se conecta ao seu código, captura automaticamente cada chamada relevante, monta a árvore de execução completa (o **trace**) e expõe tudo em um dashboard web.
 
 O ponto mais importante para entender de cara: **você não precisa usar o framework LangChain para usar o LangSmith**. Ele foi desenhado como uma ferramenta de observabilidade independente — funciona com chamadas HTTP cruas, com o SDK da OpenAI, da Anthropic, da Google, ou com qualquer função Python que você queira instrumentar. LangChain é um framework para *construir* pipelines de IA; LangSmith é uma ferramenta para *observar* pipelines de IA, sejam eles construídos com LangChain ou não.
 
@@ -119,8 +145,6 @@ LANGSMITH_API_KEY=sua-chave-langsmith
 LANGSMITH_PROJECT=sprint-fiap
 ```
 
-> **Atenção:** versões mais antigas da documentação usam `LANGCHAIN_TRACING_V2` e `LANGCHAIN_API_KEY`. Essas variáveis ainda funcionam por compatibilidade, mas a configuração atual e recomendada usa o prefixo `LANGSMITH_`.
-
 - `LANGSMITH_TRACING=true` liga o tracing globalmente. Se for `false` ou a variável não existir, o `@traceable` vira um no-op — a função roda normalmente, só que nada é enviado ao LangSmith. É assim que se desativa observabilidade em testes locais sem tocar no código.
 - `LANGSMITH_API_KEY` autentica sua aplicação com a sua conta LangSmith (gerada gratuitamente em `smith.langchain.com`).
 - `LANGSMITH_PROJECT` define em qual projeto os traces serão agrupados no dashboard.
@@ -131,7 +155,7 @@ Com essas variáveis carregadas no ambiente, qualquer função decorada com `@tr
 
 # 4. Primeiro Trace com Gemini — Passo a Passo
 
-Vamos trocar o exemplo para usar o Gemini, porque a API do Google AI Studio tem um tier gratuito (com limites de requisições por minuto) suficiente para os exercícios da disciplina, sem precisar de cartão de crédito.
+Vamos trocar o exemplo para usar o Gemini.
 
 ## 4.1 Instalação e configuração
 
