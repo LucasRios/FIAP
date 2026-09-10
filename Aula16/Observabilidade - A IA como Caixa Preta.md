@@ -259,12 +259,15 @@ from langsmith import Client
 langsmith_client = Client()
 
 def registrar_feedback(run_id: str, aprovado: bool, comentario: str | None = None):
-    """
-    run_id: o id do trace, devolvido pela função analisar() lá na Aula 5
-    aprovado: True se o usuário deu like, False se deu dislike
-    """
+    # `run.session_id` vem None no lado do cliente — o id real do projeto só
+    # existe no servidor, depois que o trace foi ingerido. Por isso buscamos o
+    # id do projeto pela API (por nome) na hora de gravar o feedback, em vez de
+    # tentar tirá-lo do RunTree.
+    project_id = langsmith_client.read_project(project_name=LANGSMITH_PROJECT).id
+
     langsmith_client.create_feedback(
         run_id=run_id,
+        session_id=project_id,
         key="aprovacao_usuario",
         score=1.0 if aprovado else 0.0,
         comment=comentario,
@@ -303,6 +306,7 @@ load_dotenv()
 
 gemini_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 langsmith_client = Client()
+LANGSMITH_PROJECT = os.environ["LANGSMITH_PROJECT"]
 
 
 # --- Etapas do pipeline, cada uma como um run filho no trace ---
@@ -317,10 +321,10 @@ def montar_prompt(texto: str) -> str:
 
 @traceable(run_type="llm")
 def chamar_modelo(prompt: str):
-    return gemini_client.models.generate_content(
-        model="gemini-2.0-flash",
-        contents=prompt,
-    )
+    # Usar Chat.send_message (em vez de Models.generate_content) evita o aviso
+    # de "Automatic function calling" que o SDK do Gemini emite na chamada direta.
+    chat = gemini_client.chats.create(model="gemini-3.5-flash")
+    return chat.send_message(prompt)
 
 
 # --- Pipeline principal: vira o run "pai" no trace ---
@@ -344,8 +348,15 @@ def analisar(texto: str, session_id: str = None) -> dict:
 # --- Registro de feedback, desacoplado da execução original ---
 
 def registrar_feedback(run_id: str, aprovado: bool, comentario: str | None = None):
+    # `run.session_id` vem None no lado do cliente — o id real do projeto só
+    # existe no servidor, depois que o trace foi ingerido. Por isso buscamos o
+    # id do projeto pela API (por nome) na hora de gravar o feedback, em vez de
+    # tentar tirá-lo do RunTree.
+    project_id = langsmith_client.read_project(project_name=LANGSMITH_PROJECT).id
+
     langsmith_client.create_feedback(
         run_id=run_id,
+        session_id=project_id,
         key="aprovacao_usuario",
         score=1.0 if aprovado else 0.0,
         comment=comentario,
@@ -358,6 +369,9 @@ if __name__ == "__main__":
         session_id="sessao-de-teste-001",
     )
     print(resultado)
+
+    # garante que o trace já foi enviado ao LangSmith antes de buscar o projeto
+    langsmith_client.flush()
 
     # simula o usuário clicando em "like" alguns instantes depois
     registrar_feedback(
