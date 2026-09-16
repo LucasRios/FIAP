@@ -375,7 +375,7 @@ opentelemetry-sdk>=1.24.0
 
 ```bash
 # rodar o coletor localmente (processo separado, terceiro terminal)
-python -m phoenix.server.main
+python -m phoenix.server.main serve
 ```
 
 ## 7.5 Uma ressalva importante sobre Phoenix para casos sem IA
