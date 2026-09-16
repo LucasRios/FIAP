@@ -1,300 +1,398 @@
-# Aula 6 — Observabilidade: Instrumentando o Pipeline ao Vivo
+# Aula 17 — Observabilidade: Instrumentando o que Já Existe no Forzy
 
 ## Objetivo
 
-Adicionar instrumentação completa ao pipeline do Sprint e explorar o dashboard do LangSmith com dados reais. Entender o que os traces revelam sobre o comportamento do modelo e como usar esse conhecimento para melhorar o produto.
+Aplicar o LangSmith nas funções que **já existem** no Forzy: `@traceable` não sabe nem se importa se a função por trás dele chama um LLM ou só faz uma query SQLite — ele observa qualquer função Python. Vamos instrumentar `equipamento_provider`, `sensor_provider` e `planta_provider`, ver as árvores de trace no dashboard, e enriquecer tudo isso com headers adicionais que o front-end (Gradio) passa a mandar.
 
 ---
 
-# 1. Revisão — O que Configuramos na Aula Anterior
+# 1. Por que Observar Algo que Não Tem IA
 
-Na Aula 5 configuramos o ambiente e fizemos a primeira chamada traceable. Agora vamos ir além: instrumentar cada camada do pipeline, não apenas o provider.
+**Qualquer** camada de acesso a dados pode estar tecnicamente saudável (sem exceção, `200 OK`) e ainda assim esconder informação importante — quanto tempo uma consulta no `motor.db` realmente levou, com que TAG um endpoint foi chamado, se a severidade calculada bateu com o que o front-end mostrou. Hoje, se um aluno reclamar "o dashboard demorou pra carregar", a única forma de investigar é adicionar `print()` manualmente e reproduzir o problema. Com tracing, isso já está registrado.
 
-```
-Pipeline atual (Aula 5)
-app.py → pipeline.py → provider.py  ← @traceable aqui
-
-Pipeline desta aula
-app.py → pipeline.py ← @traceable aqui
-              └─ provider.py ← @traceable aqui
-```
-
-Quando cada camada tem seu próprio trace, o LangSmith monta uma árvore hierárquica — você vê não só o tempo total, mas onde especificamente o pipeline é lento.
+Vamos tratar cada request ao back-end do Forzy como um pipeline observável, do mesmo jeito que trataríamos uma chamada a um modelo — só que aqui as etapas são `router → provider → SQLite`, sem nenhum LLM no meio.
 
 ---
 
-# 2. Instrumentando o Pipeline Completo
+# 2. Instrumentando os `providers/` — a camada de dados
+
+Nenhuma lógica muda. Só entra o decorator.
 
 ```python
-# backend/pipelines/news_pipeline.py
-from langsmith import traceable
-from providers import scraper_nlp_provider, modelo_provider
-
-@traceable(name="pipeline_noticia", tags=["producao", "v1"])
-def processar_noticia(url: str = None, texto: str = None, session_id: str = None) -> dict:
-    """
-    Pipeline completo: scraping → NLP → modelo.
-    Cada etapa tem seu próprio trace filho.
-    """
-    # Etapa 1 — Obter o texto
-    conteudo = _obter_conteudo(url=url, texto=texto, session_id=session_id)
-    if not conteudo:
-        return {"erro": "Não foi possível obter o conteúdo."}
-
-    # Etapa 2 — Extrair entidades e pré-processar
-    entidades = _extrair_entidades(conteudo, session_id=session_id)
-
-    # Etapa 3 — Analisar com modelo
-    analise = modelo_provider.analisar_completo(conteudo, entidades, session_id=session_id)
-
-    return {
-        "resumo": analise["resumo"],
-        "sentimento": analise["sentimento"],
-        "entidades": entidades,
-        "confianca": analise["confianca"],
-        "tokens_usados": analise["tokens_usados"]
-    }
-
-@traceable(name="obter_conteudo")
-def _obter_conteudo(url: str = None, texto: str = None, session_id: str = None) -> str | None:
-    if texto:
-        return texto
-    if url:
-        return scraper_nlp_provider.raspar_url(url)
-    return None
-
-@traceable(name="extrair_entidades")
-def _extrair_entidades(texto: str, session_id: str = None) -> list[str]:
-    return scraper_nlp_provider.extrair_entidades(texto)
-```
-
-```python
-# backend/providers/modelo_provider.py
-import anthropic
+# backend/providers/equipamento_provider.py
 from langsmith import traceable
 
-client = anthropic.Anthropic()
+# ... imports e _conn(), _row_to_dict() continuam idênticos à Aula 15 ...
 
-@traceable(name="modelo_analisar_completo", metadata={"modelo": "claude-haiku-4-5-20251001"})
-def analisar_completo(texto: str, entidades: list[str], session_id: str = None) -> dict:
-    """
-    Chama o modelo para resumo + sentimento em uma única chamada.
-    metadata= adiciona informações fixas ao trace para filtragem no dashboard.
-    """
-    prompt = f"""Analise a notícia abaixo e retorne um JSON com:
-- resumo: resumo em 2 frases
-- sentimento: "positivo", "negativo" ou "neutro"
-- confianca: score de 0.0 a 1.0
+@traceable(name="db_listar_equipamentos", run_type="tool", tags=["forzy", "sqlite", "equipamentos"])
+def listar_todos() -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute("SELECT * FROM motores ORDER BY motor_id").fetchall()
+    return [_row_to_dict(r) for r in rows]
 
-Entidades identificadas: {', '.join(entidades)}
 
-Notícia:
-{texto[:2000]}
-
-Retorne apenas o JSON, sem explicações."""
-
-    resposta = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=300,
-        messages=[{"role": "user", "content": prompt}]
-    )
-
-    import json
-    conteudo = resposta.content[0].text.strip()
-
+@traceable(name="db_buscar_equipamento", run_type="tool", tags=["forzy", "sqlite", "equipamentos"])
+def buscar_por_tag(tag: str) -> Optional[dict]:
     try:
-        resultado = json.loads(conteudo)
-    except json.JSONDecodeError:
-        # Modelo retornou algo fora do formato esperado — registramos isso
-        resultado = {"resumo": conteudo, "sentimento": "indefinido", "confianca": 0.0}
+        mid = int(tag.strip().upper().replace("MTR-", ""))
+    except (ValueError, AttributeError):
+        return None
+    with _conn() as conn:
+        row = conn.execute("SELECT * FROM motores WHERE motor_id = ?", (mid,)).fetchone()
+    return _row_to_dict(row) if row else None
 
-    resultado["tokens_usados"] = resposta.usage.input_tokens + resposta.usage.output_tokens
-    return resultado
+
+@traceable(name="db_salvar_equipamento", run_type="tool", tags=["forzy", "sqlite", "equipamentos"])
+def salvar(dados: dict) -> tuple[bool, str]:
+    # corpo idêntico ao da Aula 15 — só o decorator foi acrescentado
+    ...
 ```
 
----
+`run_type="tool"` (em vez de `"llm"` ou `"chain"`) é a marcação correta para "isto é uma chamada auxiliar de dados, não uma etapa de orquestração nem um modelo" — o LangSmith usa esse tipo para agrupar visualmente esse tipo de run no dashboard.
 
-# 3. Propagando o ID de Sessão
-
-Para conectar os traces do LangSmith com as sessões do front-end, precisamos propagar o `session_id` do header HTTP até o provider.
+O mesmo padrão se aplica aos outros dois providers:
 
 ```python
-# backend/routers/noticias.py
-from fastapi import APIRouter, Security, Header
-from typing import Optional
-
-router = APIRouter()
-
-@router.post("/noticias/analisar")
-def analisar_noticia(
-    entrada: EntradaNoticia,
-    _: str = Security(verificar_chave),
-    x_session_id: Optional[str] = Header(None),  # lê o header X-Session-Id
-    x_feature: Optional[str] = Header(None)
-):
-    # Passa o session_id para o pipeline, que passa para os providers
-    resultado = news_pipeline.processar_noticia(
-        url=entrada.url,
-        texto=entrada.texto,
-        session_id=x_session_id
-    )
-    return resultado
-```
-
-No LangSmith, você pode filtrar todos os traces de uma sessão específica e reconstruir exatamente o que um usuário fez durante sua visita ao app.
-
----
-
-# 4. Lendo o Dashboard ao Vivo
-
-Acesse `https://smith.langchain.com/o/seu-org/projects/p/sprint-fiap`.
-
-**O que observar primeiro:**
-
-**Latência por etapa**
-O gráfico de cascata mostra cada `@traceable` como uma barra. Se `extrair_entidades` demora 3s e `modelo_analisar_completo` demora 0.8s, o gargalo está no scraping/NLP, não no modelo. Isso direciona onde otimizar.
-
-**Tokens e custo**
-O LangSmith acumula tokens usados por projeto e estima o custo. Você visualiza qual combinação de prompt + modelo é mais eficiente — um prompt mais curto pode custar metade e dar o mesmo resultado.
-
-**Taxa de erro**
-Tracesss com exceção aparecem em vermelho. O LangSmith mostra o stack trace completo — você vê exatamente onde o pipeline quebrou e com qual input.
-
-**Distribuição de sentimentos**
-Com dados reais, você começa a ver padrões: 70% das análises retornam "negativo"? Pode ser viés do dataset de treino, pode ser um problema no prompt.
-
----
-
-# 5. Adicionando Tags e Metadados
-
-Tags e metadados tornam o dashboard filtrável e útil para comparação de versões:
-
-```python
+# backend/providers/sensor_provider.py
 from langsmith import traceable
 
-# Tags: rótulos livres para filtrar no dashboard
-@traceable(
-    name="analisar_sentimento",
-    tags=["producao", "v2", "noticias"]
-)
-def analisar(texto: str) -> dict:
-    ...
+@traceable(name="db_leitura_atual", run_type="tool", tags=["forzy", "sqlite", "sensores"])
+def leitura_atual(tag: str) -> dict:
+    ...  # idêntico à Aula 15
 
-# run_metadata: dicionário com informações contextuais
-@traceable(
-    name="pipeline_principal",
-    metadata={
-        "modelo": "claude-haiku-4-5-20251001",
-        "idioma": "pt",
-        "feature": "news-analysis",
-        "versao_prompt": "v3"
+
+@traceable(name="db_historico", run_type="tool", tags=["forzy", "sqlite", "sensores"])
+def historico_simulado(tag: str, n_pontos: int = 48) -> list[dict]:
+    ...  # idêntico à Aula 15
+```
+
+```python
+# backend/providers/planta_provider.py
+from langsmith import traceable
+
+@traceable(name="hierarquia_listar_plantas", run_type="tool", tags=["forzy", "plantas"])
+def listar_plantas() -> list[str]:
+    return sorted(_HIERARQUIA.keys())
+
+
+@traceable(name="hierarquia_buscar_localizacao", run_type="tool", tags=["forzy", "plantas"])
+def buscar_localizacao(tag: str) -> tuple[str, str]:
+    ...  # idêntico à Aula 15
+```
+
+Repare: mesmo sendo um dicionário em memória (sem I/O nenhum), vale a pena instrumentar `planta_provider` — no dashboard, ele deve aparecer com latência praticamente zero, o que serve de referência de comparação com os providers que batem no SQLite.
+
+---
+
+# 3. Instrumentando a Regra de Negócio — `_com_severidade`
+
+A classificação ISO 10816 em `backend/routers/sensores.py` é a única lógica de decisão do projeto (fora do CRUD puro) — vale a pena observá-la separadamente, porque é o tipo de coisa que muda com frequência (limites podem ser recalibrados) e cujo comportamento você quer conseguir auditar:
+
+```python
+# backend/routers/sensores.py
+from langsmith import traceable
+
+_LIMITES = {
+    "temp_c":       {"aviso": 75,  "critico": 90},
+    "vibracao_mms": {"aviso": 4.5, "critico": 7.1},
+}
+
+
+def _severidade(chave: str, valor: float) -> str:
+    limites = _LIMITES.get(chave)
+    if not limites:
+        return "normal"
+    if valor >= limites["critico"]:
+        return "critico"
+    if valor >= limites["aviso"]:
+        return "aviso"
+    return "normal"
+
+
+@traceable(name="classificar_severidade", run_type="tool", tags=["forzy", "iso10816"])
+def _com_severidade(leitura: dict) -> dict:
+    resultado = {
+        **leitura,
+        "severidade_temp":     _severidade("temp_c", leitura["temp_c"]),
+        "severidade_vibracao": _severidade("vibracao_mms", leitura["vibracao_mms"]),
     }
-)
-def pipeline(texto: str) -> dict:
-    ...
+    return resultado
 ```
 
-Quando você atualiza o prompt (de `versao_prompt: v2` para `v3`), filtra no LangSmith e compara as métricas lado a lado — latência, tokens, qualidade das respostas.
+Com isso instrumentado, dá pra filtrar no LangSmith só os runs de `classificar_severidade` e ver, por exemplo, que porcentagem das leituras dos últimos 7 dias caiu em `"critico"` — sem precisar tocar no banco.
 
 ---
 
-# 6. Enviando Feedback do Front-end
+# 4. Instrumentando o Endpoint — o Run "Pai" de Cada Request
 
-O like/dislike que construímos no Gradio na Aula 09 do semestre 1 pode alimentar o LangSmith. Para isso, o back-end precisa retornar o `run_id` do trace junto com a resposta:
+Os providers acima, sozinhos, geram traces soltos e desconexos — um por chamada, sem hierarquia. Para que o LangSmith monte a árvore completa de um request (endpoint → provider → SQLite), o próprio handler do FastAPI vira o run pai. Como decorar diretamente a função de rota pode interferir na injeção de dependências do FastAPI (`Security`, `Header`), usamos o context manager `trace()` dentro do corpo da função, em vez do decorator `@traceable`:
 
 ```python
-# backend/routers/noticias.py
-from langsmith import get_current_run_tree
+# backend/routers/sensores.py
+from typing import Optional
+from fastapi import APIRouter, Security, Header
+from langsmith import trace
 
-@router.post("/noticias/analisar")
-def analisar_noticia(entrada: EntradaNoticia, ...):
-    resultado = news_pipeline.processar_noticia(...)
+from auth.seguranca import verificar_chave
+from models.saida import LeituraSaida
+import providers.sensor_provider as sensor_provider
 
-    # Captura o ID do trace atual para retornar ao front-end
-    run_tree = get_current_run_tree()
-    run_id = str(run_tree.id) if run_tree else None
+router = APIRouter(prefix="/sensores", tags=["Sensores"])
 
-    return {**resultado, "trace_id": run_id}
+
+@router.get("/{tag}/leitura-atual", response_model=LeituraSaida)
+def leitura_atual(
+    tag: str,
+    _: str = Security(verificar_chave),
+    x_session_id: Optional[str] = Header(None),
+    x_app_version: Optional[str] = Header(None),
+    x_feature: Optional[str] = Header(None),
+    x_client_platform: Optional[str] = Header(None),
+):
+    with trace(
+        name="endpoint_leitura_atual",
+        run_type="chain",
+        tags=["forzy", "sensores", "endpoint"],
+        metadata={
+            "tag": tag,
+            "session_id": x_session_id,
+            "app_version": x_app_version,
+            "feature": x_feature,
+            "client_platform": x_client_platform,
+        },
+    ):
+        leitura = sensor_provider.leitura_atual(tag)   # já é @traceable — vira run filho automaticamente
+        return _com_severidade(leitura)                 # já é @traceable — outro run filho
+```
+
+O `with trace(...)` cria o run pai e, como o LangSmith propaga contexto via `contextvars`, qualquer função `@traceable` chamada dentro do bloco (`sensor_provider.leitura_atual`, `_com_severidade`) é automaticamente encaixada como filha desse run — sem passar nenhum id manualmente. O mesmo padrão se replica nos outros endpoints:
+
+```python
+# backend/routers/equipamentos.py
+@router.get("", response_model=list[EquipamentoSaida])
+def listar_equipamentos(
+    _: str = Security(verificar_chave),
+    x_session_id: Optional[str] = Header(None),
+    x_feature: Optional[str] = Header(None),
+):
+    with trace(
+        name="endpoint_listar_equipamentos",
+        run_type="chain",
+        tags=["forzy", "equipamentos", "endpoint"],
+        metadata={"session_id": x_session_id, "feature": x_feature},
+    ):
+        return eq_provider.listar_todos()
 ```
 
 ```python
-# backend/routers/feedback.py
-from fastapi import APIRouter
-from pydantic import BaseModel
-from langsmith import Client
-
-router = APIRouter()
-ls_client = Client()
-
-class EntradaFeedback(BaseModel):
-    trace_id: str
-    aprovado: bool
-    comentario: str | None = None
-
-@router.post("/feedback")
-def registrar_feedback(feedback: EntradaFeedback, _: str = Security(verificar_chave)):
-    ls_client.create_feedback(
-        run_id=feedback.trace_id,
-        key="aprovacao_usuario",
-        score=1.0 if feedback.aprovado else 0.0,
-        comment=feedback.comentario
-    )
-    return {"status": "registrado"}
+# backend/routers/plantas.py
+@router.get("/{planta}/areas/{area}/equipamentos", response_model=list[str])
+def listar_equipamentos_area(
+    planta: str,
+    area: str,
+    _: str = Security(verificar_chave),
+    x_session_id: Optional[str] = Header(None),
+    x_feature: Optional[str] = Header(None),
+):
+    with trace(
+        name="endpoint_listar_equipamentos_area",
+        run_type="chain",
+        tags=["forzy", "plantas", "endpoint"],
+        metadata={"planta": planta, "area": area, "session_id": x_session_id, "feature": x_feature},
+    ):
+        return planta_provider.listar_equipamentos(planta, area)
 ```
 
+---
+
+# 5. Headers Novos: o que o Front-end Passa a Mandar
+
+Até então o `api_provider.py` só mandava `X-API-Key`. Agora ele passa a enviar quatro headers a mais, sempre — são eles que alimentam o `metadata` mostrado acima:
+
+| Header | Preenchido com | Aparece no LangSmith como |
+|---|---|---|
+| `X-Session-Id` | UUID gerado uma vez por processo Gradio | `metadata.session_id` — permite reconstruir tudo que uma sessão fez |
+| `X-App-Version` | Versão fixa do front (`"1.3.0"`) | `metadata.app_version` — compara comportamento entre versões após um deploy |
+| `X-Feature` | Nome da página/feature que originou a chamada (`"dashboard"`, `"sensores"`, `"cadastro"`) | `metadata.feature` — filtra o dashboard por área do app, sem abrir trace por trace |
+| `X-Client-Platform` | Fixo (`"gradio-desktop"`) | `metadata.client_platform` — útil no dia em que existir um segundo cliente (mobile, CLI) |
+
 ```python
-# frontend — enviando feedback após o resultado
+# frontend/providers/api_provider.py
+import os
+import uuid
 import requests
+from dotenv import load_dotenv
 
-def enviar_feedback(trace_id: str, aprovado: bool):
-    requests.post(
-        f"{API_URL}/v1/feedback",
-        json={"trace_id": trace_id, "aprovado": aprovado},
-        headers=_HEADERS
-    )
+load_dotenv()
 
-# Após exibir o resultado
-if resultado and resultado.get("trace_id"):
-    col1, col2 = st.columns(2)
-    if col1.button("👍 Útil"):
-        enviar_feedback(resultado["trace_id"], aprovado=True)
-        st.toast("Obrigado pelo feedback!")
-    if col2.button("👎 Não útil"):
-        enviar_feedback(resultado["trace_id"], aprovado=False)
-        st.toast("Feedback registrado.")
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+API_KEY = os.getenv("API_KEY", "chave-local-dev")
+APP_VERSION = os.getenv("APP_VERSION", "1.3.0")
+
+_SESSION_ID = str(uuid.uuid4())  # um por processo — poderia ser por aba, se o Gradio suportar
+_TIMEOUT = 10
+
+
+def _headers(feature: str) -> dict:
+    return {
+        "X-API-Key": API_KEY,
+        "X-Session-Id": _SESSION_ID,
+        "X-App-Version": APP_VERSION,
+        "X-Feature": feature,
+        "X-Client-Platform": "gradio-desktop",
+    }
+
+
+def _get(path: str, feature: str, params: dict | None = None):
+    try:
+        r = requests.get(f"{API_URL}{path}", headers=_headers(feature), params=params, timeout=_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    except requests.ConnectionError:
+        print(f"[api_provider] Não foi possível conectar ao back-end em {API_URL}.")
+        return None
+    except requests.HTTPError as e:
+        if e.response.status_code == 404:
+            return None
+        print(f"[api_provider] Erro {e.response.status_code} em {path}: {e.response.text}")
+        return None
+
+
+# cada chamada agora identifica de qual feature ela vem
+def listar_todos() -> list[dict]:
+    return _get("/v1/equipamentos", feature="equipamentos") or []
+
+
+def leitura_atual(tag: str) -> dict:
+    return _get(f"/v1/sensores/{tag}/leitura-atual", feature="sensores") or {}
+
+
+def listar_equipamentos(planta: str, area: str) -> list[str]:
+    return _get(f"/v1/plantas/{planta}/areas/{area}/equipamentos", feature="dashboard") or []
 ```
 
-Com isso, cada like/dislike do usuário fica associado ao trace exato do modelo — você sabe qual resposta agradou e qual não agradou, e pode usar esses dados para melhorar o prompt.
+Note que `feature` passa a ser um parâmetro explícito de cada função do `api_provider` — é assim que o front "sabe" de onde a chamada partiu e consegue rotular o header corretamente, sem precisar inspecionar de onde a função foi chamada.
 
 ---
 
-# 7. Alternativa — Arize Phoenix (self-hosted)
+# 6. Lendo o Dashboard
 
-Para quem prefere não enviar dados para um serviço externo, o Arize Phoenix oferece as mesmas capacidades rodando localmente:
+Com tudo isso no ar:
+
+**Árvore por request.** Cada chamada ao endpoint de leitura aparece como `endpoint_leitura_atual` com dois filhos: `db_leitura_atual` (a query) e `classificar_severidade` (a regra). Dá pra ver exatamente quanto do tempo total foi SQLite e quanto foi Python puro.
+
+**Filtro por feature.** Como `metadata.feature` está presente em todo trace, filtrar `feature = "dashboard"` isola só os requests originados da navegação Planta → Área → Equipamento, sem misturar com a página de Sensores.
+
+**Filtro por sessão.** `metadata.session_id` permite pegar uma sessão específica do Gradio e ver, em ordem, tudo que aquele processo fez — útil se alguém reportar "o app ficou lento" e você quiser reconstruir o que aconteceu antes.
+
+**Comparação entre versões.** Se `APP_VERSION` mudar de `"1.3.0"` para `"1.4.0"` num deploy, filtrar por `metadata.app_version` e comparar latência/erro entre as duas versões mostra se o deploy piorou algo, sem precisar de nenhuma ferramenta de deploy adicional.
+
+**Taxa de erro por camada.** Um trace vermelho em `db_buscar_equipamento` (TAG inexistente) é visualmente diferente de um erro em `endpoint_leitura_atual` propagado de mais fundo — a árvore já mostra em qual camada a exceção nasceu.
+
+---
+
+# 7. Alternativa — Arize Phoenix em Detalhe
+
+## 7.1 O que é
+
+Arize Phoenix é a ferramenta de observabilidade **open-source** da Arize AI, construída em cima do **OpenTelemetry** — o padrão vendor-neutral de telemetria distribuída. A diferença central em relação ao LangSmith não é a funcionalidade, é onde os dados moram: Phoenix roda **localmente ou em infraestrutura própria** (self-hosted), então nada do que passa pelo Forzy — TAGs de motores, leituras, dados de planta — sai da rede da empresa. Para um sistema industrial como este, cujos dados podem ser proprietários de uma planta específica, isso pesa mais do que pesaria num app de uso geral.
+
+## 7.2 Hierarquia de conceitos
+
+| LangSmith | Phoenix / OpenTelemetry |
+|---|---|
+| Project | Project |
+| Trace | Trace |
+| Run | Span |
+| `tags=[...]` | atributos de span (`span.set_attribute`) |
+| `metadata={...}` | atributos de span |
+| `run_type="tool"` | atributo customizado (ex: `span.kind = "TOOL"`) |
+
+## 7.3 Instrumentação equivalente
+
+```python
+# backend/providers/equipamento_provider.py — versão Phoenix
+from opentelemetry import trace as otel_trace
+
+tracer = otel_trace.get_tracer(__name__)
+
+
+def listar_todos() -> list[dict]:
+    with tracer.start_as_current_span("db_listar_equipamentos") as span:
+        span.set_attribute("forzy.camada", "sqlite")
+        with _conn() as conn:
+            rows = conn.execute("SELECT * FROM motores ORDER BY motor_id").fetchall()
+        resultado = [_row_to_dict(r) for r in rows]
+        span.set_attribute("forzy.total_registros", len(resultado))
+        return resultado
+```
+
+```python
+# backend/routers/sensores.py — versão Phoenix, com os mesmos headers da seção 5
+@router.get("/{tag}/leitura-atual", response_model=LeituraSaida)
+def leitura_atual(
+    tag: str,
+    _: str = Security(verificar_chave),
+    x_session_id: Optional[str] = Header(None),
+    x_app_version: Optional[str] = Header(None),
+    x_feature: Optional[str] = Header(None),
+):
+    with tracer.start_as_current_span("endpoint_leitura_atual") as span:
+        span.set_attribute("forzy.tag", tag)
+        span.set_attribute("session.id", x_session_id or "desconhecida")
+        span.set_attribute("app.version", x_app_version or "desconhecida")
+        span.set_attribute("forzy.feature", x_feature or "desconhecida")
+
+        leitura = sensor_provider.leitura_atual(tag)      # span filho automático (contextvars do OTel)
+        return _com_severidade(leitura)                    # span filho automático
+```
+
+```python
+# backend/main.py — inicialização, uma vez, no startup
+from phoenix.otel import register
+
+register(project_name="forzy-digital-twin", endpoint="http://localhost:6006/v1/traces")
+```
+
+## 7.4 O que muda para migrar
+
+| Item | LangSmith | Phoenix |
+|---|---|---|
+| Onde os dados ficam | Cloud (`smith.langchain.com`) | Local — `python -m phoenix.server.main`, porta `6006` |
+| Dependências | `langsmith` | `arize-phoenix`, `opentelemetry-sdk` |
+| Variáveis de ambiente | `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT`, `LANGSMITH_TRACING` | Nenhuma API key — só o `endpoint` do coletor local |
+| Instrumentar providers | `@traceable(run_type="tool")` na função | `with tracer.start_as_current_span(...)` envolvendo o corpo |
+| Instrumentar endpoints | `with trace(...)` do LangSmith | `with tracer.start_as_current_span(...)` do OpenTelemetry |
+| Passar headers como metadata | `metadata={...}` no `trace()` | `span.set_attribute(...)` |
+| Hierarquia pai-filho | Automática via `contextvars` do LangSmith | Automática via `contextvars` do OpenTelemetry — mesmo mecanismo |
+| Dashboard | `smith.langchain.com` | `http://localhost:6006` |
 
 ```bash
-pip install arize-phoenix
+# backend/requirements.txt — trocando LangSmith por Phoenix
+arize-phoenix>=5.0.0
+opentelemetry-sdk>=1.24.0
+```
+
+```bash
+# rodar o coletor localmente (processo separado, terceiro terminal)
 python -m phoenix.server.main
-# Interface em http://localhost:6006
 ```
 
-```python
-import phoenix as px
-from openinference.instrumentation.anthropic import AnthropicInstrumentor
+## 7.5 Uma ressalva importante sobre Phoenix para casos sem IA
 
-px.launch_app()
-AnthropicInstrumentor().instrument()
+O dashboard do Phoenix foi desenhado em torno de convenções semânticas de LLM (prompt, completion, tokens) — spans genéricos de negócio, como os do Forzy, aparecem e funcionam normalmente (afinal, é OpenTelemetry puro por baixo), mas a visualização é menos rica para esse caso do que seria para um span de chamada a modelo. Se o objetivo fosse observar **só** lógica de negócio sem nenhuma IA no projeto, vale considerar um backend de OpenTelemetry mais genérico (Jaeger, Grafana Tempo) em vez de Phoenix.
 
-# A partir daqui, todas as chamadas Anthropic são capturadas automaticamente
-```
+## 7.6 Quando escolher qual
 
-A escolha entre LangSmith (cloud) e Phoenix (self-hosted) depende de requisitos de privacidade dos dados. Em produção com dados sensíveis, Phoenix é a escolha mais segura.
+Phoenix compensa quando os dados do Forzy são proprietários e não podem sair da rede do cliente, ou quando o time já usa OpenTelemetry em outros serviços e quer um único padrão. LangSmith compensa quando o time quer o menor esforço de instrumentação possível e não tem infraestrutura própria para hospedar um dashboard adicional.
 
 ---
 
 # Referências
 
-- [LangSmith — Tracing](https://docs.smith.langchain.com/observability/how_to_guides/tracing)
-- [LangSmith — Feedback](https://docs.smith.langchain.com/evaluation/how_to_guides/annotation_queues)
-- [Arize Phoenix](https://docs.arize.com/phoenix)
-- [OpenTelemetry — Semantic Conventions for AI](https://opentelemetry.io/docs/specs/semconv/gen-ai/)
+- [LangSmith — Tracing Quickstart](https://docs.langchain.com/langsmith/observability-quickstart)
+- [LangSmith — `trace()` context manager](https://docs.smith.langchain.com/observability/how_to_guides/tracing)
+- [Arize Phoenix — Documentação](https://docs.arize.com/phoenix)
+- [Arize Phoenix — Quickstart Tracing](https://docs.arize.com/phoenix/tracing/llm-traces)
+- [OpenTelemetry — Python SDK](https://opentelemetry.io/docs/languages/python/)
+- [ISO 10816 — Mechanical vibration evaluation](https://www.iso.org/standard/23076.html)
