@@ -284,8 +284,8 @@ Crie o arquivo `backend/Dockerfile` (sem extensão) com o conteúdo abaixo. Em s
 ```dockerfile
 # backend/Dockerfile — imagem da API FastAPI do Forzy
 
-# 1. Imagem base: Linux mínimo com Python 3.11 já instalado
-FROM python:3.11-slim
+# 1. Imagem base: Linux mínimo com Python 3.12 já instalado
+FROM python:3.12.10
 
 # 2. Ajustes de comportamento do Python dentro do container
 #    - PYTHONDONTWRITEBYTECODE: não gera arquivos .pyc (inúteis num container)
@@ -422,7 +422,7 @@ Crie o arquivo `frontend/Dockerfile`:
 ```dockerfile
 # frontend/Dockerfile — imagem da interface Gradio do Forzy
 
-FROM python:3.11-slim
+FROM python:3.12.10
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -488,7 +488,7 @@ Existem duas formas de resolver:
 
    ```bash
    docker run --name forzy-frontend -p 7860:7860 --env-file .env \
-     -e API_URL=http://host.docker.internal:8000 forzy-frontend
+   -e API_URL=http://host.docker.internal:8000 forzy-frontend
    ```
 
    No Linux, esse endereço não existe por padrão. É preciso acrescentar `--add-host=host.docker.internal:host-gateway` ao comando.
