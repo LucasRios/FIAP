@@ -1,4 +1,4 @@
-# Aula 19 — Docker: Containerizando o Forzy
+# Aula 19 — Docker: Containerizando a API
 
 Neste ponto o Forzy já está dividido em dois processos independentes:
 
@@ -122,19 +122,6 @@ docker-compose.yml ──(docker compose up)──▶ vários containers + rede 
 2. Durante a instalação, mantenha marcada a opção de usar o **WSL 2** (o subsistema Linux do Windows). Se o instalador pedir para instalar ou atualizar o WSL, aceite e reinicie o computador.
 3. Abra o Docker Desktop e espere o indicador no canto inferior esquerdo ficar verde ("Engine running").
 
-## macOS
-
-1. Baixe o **Docker Desktop para Mac** no mesmo endereço, escolhendo a versão do seu processador (Apple Silicon ou Intel).
-2. Arraste para a pasta Aplicativos, abra e aguarde o motor iniciar.
-
-## Linux
-
-Siga o guia oficial de instalação do Docker Engine para a sua distribuição ([docs.docker.com/engine/install](https://docs.docker.com/engine/install/)). Depois, adicione seu usuário ao grupo `docker` para não precisar de `sudo` em todo comando:
-
-```bash
-sudo usermod -aG docker $USER
-# saia da sessão e entre de novo para a mudança ter efeito
-```
 
 ## Verificando a instalação
 
@@ -147,8 +134,6 @@ docker run hello-world
 ```
 
 O último comando baixa uma imagem minúscula de teste e cria um container a partir dela. Se aparecer a mensagem "Hello from Docker!", está tudo funcionando.
-
-> **Atenção:** nesta aula usamos sempre `docker compose` (com espaço), que é a versão atual da ferramenta, já embutida no Docker. Em materiais antigos você vai encontrar `docker-compose` (com hífen) — é a versão anterior, instalada separadamente. Os comandos são praticamente os mesmos.
 
 ---
 
@@ -278,7 +263,7 @@ __pycache__/
 .git
 ```
 
-Repare que o `motor.db` **não** está no `.dockerignore` do back-end. Queremos que ele entre na imagem como banco inicial, com os motores e as leituras já cadastrados. Na seção 8 vamos discutir em detalhe o que isso significa.
+Repare que o `motor.db` **não** está no `.dockerignore` do back-end. Queremos que ele entre na imagem como banco inicial, com os motores e as leituras já cadastrados. 
 
 ## 5.4 O detalhe que mais derruba gente: `localhost` dentro do container
 
@@ -900,30 +885,6 @@ Com `docker compose up --build` rodando, confira cada item:
 | Traces não chegam no LangSmith | Variáveis `LANGSMITH_*` ausentes do `backend/.env` | Conferir o arquivo e reiniciar com `docker compose up -d` |
 | Mudei o código e nada mudou no container | Imagem antiga sendo reutilizada | Rodar `docker compose up --build` (com `--build`) |
 
----
-
-# 16. Exercícios
-
-**1. Porta alternativa.** Altere o compose para que a API fique acessível em `localhost:9000` na sua máquina, sem mudar nada dentro do container. O front precisa continuar funcionando. Explique por que o `API_URL` do front **não** precisa mudar.
-
-**2. Versão da interface.** Mude `APP_VERSION` no `frontend/.env` para `1.4.0`, suba o Forzy e faça algumas chamadas. No LangSmith, filtre por `metadata.app_version` e compare os traces das duas versões. Responda: a imagem do front precisou ser reconstruída para essa mudança? Por quê?
-
-**3. Volume nomeado.** Troque o bind mount do `motor.db` por um volume nomeado do Docker. Dica: um volume nomeado precisa ser montado numa **pasta**, e não num arquivo. Pense no que precisaria mudar no caminho do banco dentro dos providers e em como o banco inicial chegaria até esse volume. Descreva a solução, mesmo que não implemente tudo.
-
-**4. Tamanho da imagem.** Rode `docker images` e anote o tamanho de `forzy-backend` e `forzy-frontend`. Troque a imagem base de uma delas de `python:3.11-slim` para `python:3.11`, reconstrua e compare. Qual é a diferença? Em que situação a imagem completa seria necessária?
-
-**5. Segredo vazado.** Adicione temporariamente `ENV API_KEY=teste123` ao `backend/Dockerfile`, reconstrua e rode `docker history forzy-backend`. Encontre a chave na saída. Remova a linha e reconstrua. Escreva, em duas frases, por que essa prática é perigosa.
-
----
-
-# 17. O que Você Tem ao Final desta Aula
-
-- Um `Dockerfile` para o back-end e outro para o front-end do Forzy, rodando como usuário sem privilégios e com verificação de saúde.
-- Um `docker-compose.yml` que sobe o projeto inteiro com um comando, na ordem certa, com os dois serviços se encontrando pelo nome.
-- O `motor.db` fora do container, com os cadastros sobrevivendo à remoção e recriação dos containers.
-- Segredos fora da imagem, entregues só na execução.
-- O LangSmith funcionando sem nenhuma alteração de código.
-- Uma imagem da API do Forzy pronta para ser enviada a uma plataforma de nuvem — que é exatamente o próximo passo.
 
 ---
 
