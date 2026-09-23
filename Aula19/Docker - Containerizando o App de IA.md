@@ -187,19 +187,19 @@ Abra o arquivo gerado, copie para o `requirements.txt` apenas as bibliotecas que
 
 ```text
 # backend/requirements.txt
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
-pydantic>=2.0.0
-python-dotenv>=1.0.0
-langsmith>=0.1.0
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+pydantic==2.13.5
+python-dotenv==1.2.3
+langsmith==0.14.0
 ```
 
 ```text
 # frontend/requirements.txt
-gradio>=4.44.0
-plotly>=5.0.0
-requests>=2.31.0
-python-dotenv>=1.0.0
+gradio==6.28.0
+plotly==7.1.0
+requests==2.34.2
+python-dotenv==1.2.3
 ```
 
 > Se você preferir manter `>=` durante a aula, tudo funciona. Mas antes de entregar o projeto ou fazer deploy, fixe as versões — é isso que garante que a imagem construída daqui a três meses seja igual à de hoje.
