@@ -1,22 +1,28 @@
-# =============================================================================
-# frontend/Dockerfile — Aula 19
-# NOVO NESTA AULA: este arquivo inteiro.
-# =============================================================================
+# frontend/Dockerfile — imagem da interface Gradio do Forzy
 
-FROM python:3.11-slim
+FROM python:3.12.10
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    # O Gradio lê estas variáveis automaticamente ao chamar launch():
+    # escutar em todas as interfaces (obrigatório dentro de container) e na porta 7860
+    GRADIO_SERVER_NAME=0.0.0.0 \
+    GRADIO_SERVER_PORT=7860
+
+RUN useradd --create-home --uid 1000 forzy
 
 WORKDIR /app
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY --chown=forzy:forzy . .
 
-# Porta padrão do Streamlit
-EXPOSE 8501
+USER forzy
 
-# Healthcheck: o Docker verifica a cada 30s se o app está respondendo
-HEALTHCHECK CMD curl --fail http://localhost:8501/_stcore/health || exit 1
+EXPOSE 7860
 
-# --server.address=0.0.0.0 permite que o app aceite conexões de fora do container
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/')" || exit 1
+
+CMD ["python", "app.py"]

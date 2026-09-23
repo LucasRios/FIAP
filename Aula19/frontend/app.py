@@ -1,37 +1,91 @@
 # =============================================================================
-# frontend/app.py — Aula 19: front-end pensado para rodar em container Docker
+# app.py — Ponto de entrada da aplicação
 #
-# REAPROVEITADO DAS AULAS 13/15 — nenhuma linha Python muda aqui. O que é
-# NOVO NESTA AULA é o Dockerfile (frontend/Dockerfile), que containeriza
-# exatamente este mesmo app.
-#
-# DETALHE IMPORTANTE para quando este app roda dentro do Docker: a variável
-# API_URL passa a apontar para "http://backend:8000" (o nome do serviço no
-# docker-compose.yml), e não mais para "http://localhost:8000" — dentro da
-# rede Docker, os containers se enxergam pelo NOME do serviço.
+# Estrutura:
+#   ui/sidebar.py       ← componente visual do menu (sem lógica)
+#   state/app_state.py  ← gr.State compartilhados entre páginas
+#   features/*/page.py  ← conteúdo de cada página
 # =============================================================================
 
-import streamlit as st
-import requests
-import os
+import gradio as gr
 
-st.set_page_config(page_title="Sprint FIAP (Docker)", page_icon="🐳", layout="wide")
-st.title("Sprint FIAP — rodando em containers Docker")
+import features.equipamentos.page  as equipamento_page
+import features.cadastro.page      as cadastro_page
+import features.sensores.page      as dados_brutos_page
+import features.dashboard.page     as dashboard_page       # Sprint 2
 
-# os.environ.get lê a variável de ambiente definida no docker-compose.yml
-# (veja "environment: - API_URL=http://backend:8000" no compose).
-# O valor padrão "http://localhost:8000" continua funcionando se você rodar
-# este app fora do Docker, direto com "streamlit run app.py".
-API_URL = os.environ.get("API_URL", "http://localhost:8000")
+from state.app_state import AppState
+from ui.sidebar      import criar_sidebar
 
-texto = st.text_area("Cole um texto para testar a conexão com o back-end:")
 
-if st.button("Testar conexão") and texto:
-    try:
-        resposta = requests.get(f"{API_URL}/docs-info", timeout=5)
-        st.success(f"Back-end respondeu: {resposta.json()}")
-    except requests.ConnectionError:
-        st.error(
-            f"Não foi possível conectar em {API_URL}. "
-            "Verifique se o container do back-end está no ar."
-        )
+with gr.Blocks(title="Forzy · Digital Twin") as app:
+
+    state = AppState()
+
+    # Sidebar: retorna os botões do menu para conectarmos os eventos abaixo
+    botoes = criar_sidebar(open=True)
+
+    # Cada página é uma coluna. Só uma fica visível por vez.
+    # A página equipamento começa visível (visible=True); as demais ficam ocultas.
+    with gr.Column(visible=True) as col_equipamento:
+        equipamento_page.criar_pagina(state)
+
+    with gr.Column(visible=False) as col_cadastro:
+        cadastro_page.criar_pagina(state)
+
+    with gr.Column(visible=False) as col_dados:
+        dados_brutos_page.criar_pagina(state)
+
+    with gr.Column(visible=False) as col_dashboard:      # Sprint 2
+        dashboard_page.criar_pagina(state)
+
+    # ── Navegação ───────────────────────────────────────────────────────────
+    # A ideia: state.pagina_atual guarda qual página está ativa ("equipamento",
+    # "cadastro" ou "dados"). Quando esse valor muda — seja pelo clique
+    # num botão do menu, seja por um botão dentro de uma feature —
+    # a função _navegar() é chamada e mostra a coluna correta.
+
+    def _navegar(pagina: str):
+        """
+        Recebe o nome da página que deve ficar visível e retorna
+        as atualizações necessárias para cada coluna e botão do menu.
+
+        visible=True  → coluna aparece na tela
+        visible=False → coluna some da tela
+
+        variant="primary"   → botão do menu fica destacado (página ativa)
+        variant="secondary" → botão do menu fica normal
+        """
+
+        # Decide qual coluna mostrar e quais esconder
+        mostrar_equipamento = gr.update(visible = pagina == "equipamentos")
+        mostrar_cadastro    = gr.update(visible = pagina == "cadastro")
+        mostrar_dados       = gr.update(visible = pagina == "dados")
+        mostrar_dashboard   = gr.update(visible = pagina == "dashboard")   # Sprint 2
+
+        # Destaca o botão do menu que corresponde à página ativa
+        # (Cadastro não tem botão no menu — é acessado pela equipamento)
+        destacar_equipamento = gr.update(variant = "primary" if pagina in ("equipamentos", "cadastro") else "secondary")
+        destacar_dados       = gr.update(variant = "primary" if pagina == "dados"      else "secondary")
+        destacar_dashboard   = gr.update(variant = "primary" if pagina == "dashboard"  else "secondary")  # Sprint 2
+
+        return mostrar_equipamento, mostrar_cadastro, mostrar_dados, mostrar_dashboard, destacar_equipamento, destacar_dados, destacar_dashboard
+
+    # Conecta _navegar ao estado — dispara sempre que pagina_atual mudar
+    state.pagina_atual.change(
+        fn=_navegar,
+        inputs=state.pagina_atual,
+        outputs=[col_equipamento, col_cadastro, col_dados, col_dashboard,
+                 botoes["equipamentos"], botoes["dados"], botoes["dashboard"]],
+    )
+
+    # Botões do menu: cada um escreve o nome da sua página em pagina_atual
+    # O .change() acima cuida do resto automaticamente
+    botoes["equipamentos"].click(fn=lambda: "equipamentos", outputs=state.pagina_atual)
+    botoes["dados"].click(fn=lambda: "dados",               outputs=state.pagina_atual)
+    botoes["dashboard"].click(fn=lambda: "dashboard",       outputs=state.pagina_atual)  # Sprint 2
+
+
+# share=True cria um link público temporário (útil para testar em outro dispositivo).
+# Para uso local em sala de aula, deixamos desligado por padrão.
+app.launch(share=False, inbrowser=True)
