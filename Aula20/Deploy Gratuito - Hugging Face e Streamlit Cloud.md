@@ -8,7 +8,7 @@ docker compose up
   └── forzy-frontend  → localhost:7860   Gradio
 ```
 
-Os dois containers se enxergam porque estão na mesma rede do compose, e você os acessa porque as portas foram publicadas na sua máquina. Só que tudo isso morre no instante em que você fecha o terminal — e ninguém além de você jamais viu o projeto funcionando.
+Os dois containers se enxergam porque estão na mesma rede do compose, e você os acessa porque as portas foram publicadas na sua máquina. Só que tudo isso morre no instante em que você fecha o docker — e ninguém além de você jamais viu o projeto funcionando.
 
 Hoje trocamos `localhost` por dois endereços públicos:
 
@@ -30,27 +30,7 @@ E a API vai subir **duas vezes**, na mesma plataforma: uma sem Docker nenhum, ou
 
 ---
 
-# 1. Uma Lição que Não Estava no Plano
-
-Este material foi escrito para publicar a API num **Hugging Face Space em modo Docker**, que era gratuito. Em **julho de 2026**, sem nenhum anúncio, o Hugging Face passou a exigir plano pago para criar Spaces com SDK Docker. Quem tenta agora recebe:
-
-> *Add billing to your account (credits or subscribe to PRO) to unlock Docker Spaces*
-
-A página de preços sequer foi atualizada. A mudança só apareceu no fórum, em relatos de usuários.
-
-Guarde isso, porque é uma lição de arquitetura mais valiosa do que qualquer comando desta aula:
-
-> **Um tier gratuito é uma decisão comercial de outra empresa, e ela pode mudar da noite para o dia, sem aviso.**
-
-Se o seu projeto depende de uma plataforma específica para existir, você não controla o próprio projeto. A defesa não é escolher "a plataforma certa" — é manter a aplicação **portável**, de forma que trocar de casa seja um trabalho de uma tarde e não uma reescrita.
-
-E é exatamente aqui que o Docker se paga. Repare no que vai acontecer nesta aula: a mesma API, sem uma linha de código alterada, vai subir num provedor completamente diferente do planejado. O Dockerfile da aula passada continua valendo, porque ele descreve a aplicação, não a plataforma.
-
-A Aula 19, então, não foi sobre o Hugging Face. Foi sobre não depender dele.
-
----
-
-# 2. Onde Cada Coisa Pode Morar Hoje
+# 1. Onde Cada Coisa Pode Morar Hoje
 
 Nenhuma plataforma gratuita roda "qualquer coisa". Cada uma sabe executar um formato de aplicação, e é isso que decide onde cada parte do Forzy vai parar.
 
@@ -63,15 +43,13 @@ Nenhuma plataforma gratuita roda "qualquer coisa". Cada uma sabe executar um for
 | Koyeb | sim | sim | sim | variável |
 | Railway | só US$ 1/mês de crédito | sim | sim | para quando o crédito acaba |
 
-Heroku encerrou o tier gratuito em 2022 e o Fly.io reduziu o dele em 2024. Vercel e Cloudflare Workers não servem para o Forzy: a primeira corta a execução em 10 segundos, a segunda limita a 10 milissegundos de CPU — nenhuma das duas roda um processo Python de longa duração.
-
 A escolha desta aula:
 
-- **API FastAPI → Render.** É a única opção da lista que aceita, de graça e sem cartão, tanto um Dockerfile quanto código Python puro. Essa dupla possibilidade é o que permite a comparação da seção 5.
+- **API FastAPI → Render.** É a única opção da lista que aceita, de graça e sem cartão, tanto um Dockerfile quanto código Python puro.
 - **Front Streamlit → Streamlit Community Cloud.** A casa natural dele.
 - **Front Gradio → Hugging Face Spaces com SDK `gradio`.** Continua gratuito; só o SDK Docker virou pago.
 
-## 2.1 A separação que já estava pronta
+## 1.1 A separação que já estava pronta
 
 Talvez o ponto mais importante desta aula não seja técnico. Repare no que estamos prestes a fazer: colocar o front num provedor, o back em outro, e fazer os dois conversarem por HTTP, sem que nenhuma linha de regra de negócio precise ser movida ou duplicada.
 
@@ -81,7 +59,7 @@ Guarde essa observação, porque ela reaparece na aula de mobile: **o produto é
 
 ---
 
-# 3. Preparando o Repositório
+# 2. Preparando o Repositório
 
 Antes de qualquer deploy, duas regras valem para todas as plataformas.
 
@@ -117,7 +95,7 @@ venv/
 
 > **Se uma chave já foi commitada por engano**, não basta apagar o arquivo e commitar de novo: ela continua no histórico do Git, acessível a qualquer um. O caminho correto é **revogar a chave** no painel do serviço e gerar outra. Considere a chave antiga perdida.
 
-## 3.1 O que vai para o repositório
+## 2.1 O que vai para o repositório
 
 ```
 forzy/
@@ -144,13 +122,13 @@ Nenhuma dessas pastas depende das outras. É por isso que elas podem ser publica
 
 ---
 
-# 4. Parte 1 — A API no Render, sem Docker
+# 3. Parte 1 — A API no Render, sem Docker
 
 Esta parte vem primeiro por um motivo prático: o front só pode ser configurado depois que você souber o endereço da API.
 
 E começamos **sem Docker** de propósito. Assim fica claro, por contraste, o que o Dockerfile acrescenta na Parte 2.
 
-## 4.1 Criando a conta e o serviço
+## 3.1 Criando a conta e o serviço
 
 1. Acesse [render.com](https://render.com) e crie a conta entrando com o GitHub. **Não é pedido cartão de crédito** para o plano gratuito.
 2. No painel, escolha **New → Web Service**.
@@ -183,7 +161,7 @@ Cinco campos merecem explicação.
 
 **`Instance Type: Free`** — 512 MB de memória e 750 horas por mês. Uma instância rodando o mês inteiro usa cerca de 730 horas, então cabe.
 
-## 4.2 A versão do Python
+## 3.2 A versão do Python
 
 O runtime nativo escolhe uma versão padrão do Python, que muda com o tempo. Como o Forzy usa sintaxe que exige 3.10 ou superior (`list[dict]`, `dict | None`), e como você testou tudo numa versão específica, fixe-a. Crie o arquivo:
 
@@ -194,7 +172,7 @@ O runtime nativo escolhe uma versão padrão do Python, que muda com o tempo. Co
 
 Este arquivo é o equivalente, no runtime nativo, à linha `FROM python:3.12.10` do Dockerfile. Repare na diferença de alcance: o Dockerfile fixa o sistema operacional inteiro; o `.python-version` fixa só o interpretador. Volte a esse ponto na seção 6.
 
-## 4.3 Configurando as variáveis de ambiente
+## 3.3 Configurando as variáveis de ambiente
 
 Ainda na tela de criação, abra **Environment Variables** e cadastre:
 
@@ -215,7 +193,7 @@ As variáveis chegam à aplicação do mesmo jeito que o `--env-file` fazia loca
 
 > O `load_dotenv()` do `main.py` não encontra arquivo `.env` nenhum no servidor — e isso não é problema. Ele simplesmente não carrega nada e segue adiante, porque as variáveis já estão no ambiente.
 
-## 4.4 Publicando e testando
+## 3.4 Publicando e testando
 
 Clique em **Create Web Service**. O Render clona o repositório, roda o build e sobe a aplicação. Acompanhe pela aba **Logs**: é lá que aparece um pacote faltando no `requirements.txt` ou um erro de import.
 
@@ -250,11 +228,11 @@ Pelo navegador, `https://forzy-api.onrender.com/docs` abre o Swagger. Clique em 
 
 ---
 
-# 5. Parte 2 — A Mesma API no Render, com Docker
+# 4. Parte 2 — A Mesma API no Render, com Docker
 
 Agora publique a **mesma aplicação, do mesmo repositório**, num segundo serviço — desta vez usando o Dockerfile da Aula 19. Os dois vão conviver, e comparar os dois é o objetivo.
 
-## 5.1 O Dockerfile precisa aprender sobre `$PORT`
+## 4.1 O Dockerfile precisa aprender sobre `$PORT`
 
 Há um ajuste obrigatório. O Dockerfile da aula passada termina assim:
 
@@ -289,7 +267,7 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
 
 Nada disso quebra o uso local: como o `ENV PORT=8000` define o padrão, `docker compose up` e `docker run -p 8000:8000` continuam funcionando exatamente como antes.
 
-## 5.2 Criando o segundo serviço
+## 4.2 Criando o segundo serviço
 
 No Render, **New → Web Service**, mesmo repositório, e agora:
 
@@ -313,7 +291,7 @@ Teste com os mesmos três comandos `curl`, trocando a URL para `https://forzy-ap
 
 ---
 
-# 6. O Que os Dois Modos Ensinam
+# 5. O Que os Dois Modos Ensinam
 
 Você tem agora duas URLs que servem a mesma API. A diferença não está no que elas fazem, e sim em **quem decidiu cada coisa**.
 
@@ -331,7 +309,7 @@ Você tem agora duas URLs que servem a mesma API. A diferença não está no que
 
 Leia a tabela de baixo para cima e a conclusão aparece sozinha.
 
-**Sem Docker, a configuração da sua aplicação mora no painel de um fornecedor.** Ela não está no Git, ninguém revisa em pull request, e quem for reproduzir o ambiente precisa de acesso àquela conta. Se a plataforma sumir — ou passar a cobrar, como aconteceu em julho —, a configuração some junto.
+**Sem Docker, a configuração da sua aplicação mora no painel de um fornecedor.** Ela não está no Git, ninguém revisa em pull request, e quem for reproduzir o ambiente precisa de acesso àquela conta. Se a plataforma sumir, a configuração some junto.
 
 **Com Docker, ela mora no repositório.** Versionada, revisável, e igual em qualquer lugar que aceite containers.
 
@@ -341,20 +319,13 @@ Em troca, o Docker cobra: mais um arquivo para manter, builds mais lentos, e um 
 
 ---
 
-# 7. O Preço do Gratuito
+# 6. O Preço do Gratuito
 
 O serviço está no ar e não custa nada. Em troca, três coisas passam a ser verdade. Entendê-las importa mais do que o deploy em si.
 
-## 7.1 O disco é efêmero
+## 6.1 O disco é efêmero
 
 Lembra do experimento da aula anterior, em que o motor cadastrado sumia quando o container era removido e recriado? **No plano gratuito do Render isso acontece sozinho.** O sistema de arquivos é efêmero: a cada novo deploy, a cada reinício e a cada saída da hibernação, a aplicação recomeça do zero, com o `motor.db` que veio do repositório.
-
-Faça o teste e veja com os próprios olhos:
-
-1. Cadastre o `MTR-099` pelo Swagger da API publicada.
-2. Confirme com `GET /v1/equipamentos/MTR-099`.
-3. No painel do Render, clique em **Manual Deploy → Deploy latest commit**.
-4. Consulte de novo. O motor sumiu.
 
 Não é um defeito da plataforma, é o modelo dela. Um container de nuvem é descartável por definição, e nesse modelo o banco tem que morar fora dele.
 
@@ -364,9 +335,7 @@ O que um sistema real faria:
 - **Banco gerenciado externo**: o SQLite dá lugar a um Postgres hospedado, que roda como serviço separado e sobrevive a qualquer coisa que aconteça com a aplicação. O Render oferece um Postgres gratuito, com validade limitada.
 - **Servidor próprio com volume**, que é o caminho da próxima aula, na AWS.
 
-Para o Forzy em sala, aceite o comportamento e saiba explicá-lo. Se alguém perguntar na apresentação "e se eu cadastrar um motor?", a resposta certa não é "não pensei nisso" — é "no plano gratuito o disco é efêmero; a persistência exigiria disco anexado ou banco gerenciado".
-
-## 7.2 A aplicação hiberna — e isso quebra o front
+## 6.2 A aplicação hiberna — e isso quebra o front
 
 O Render pausa um serviço gratuito depois de **15 minutos sem receber requisições**. O próximo acesso não dá erro: ele **acorda** o serviço, e isso leva de **30 a 50 segundos**, porque a aplicação precisa subir do zero.
 
@@ -408,9 +377,7 @@ if not st.session_state.get("_api_acordada"):
 
 O ganho não é só técnico. Com o `st.spinner`, o usuário **vê** o custo do tier gratuito, em vez de encarar um erro sem explicação. Comunicar uma limitação conhecida é diferente de falhar.
 
-> **Na apresentação:** abra o app alguns minutos antes. Front e API hibernam de forma independente, então a primeira visita pode pagar dois tempos de espera somados.
-
-## 7.3 Você não controla a rede
+## 6.3 Você não controla a rede
 
 Sem IP fixo, sem regra de firewall, sem escolher região, sem decidir quem acessa o quê. O Render hospeda nos Estados Unidos; o Streamlit Cloud também.
 
@@ -418,9 +385,9 @@ Para uma demonstração isso é irrelevante. Para um sistema que lê dados propr
 
 ---
 
-# 8. O Front Precisa de Três Mudanças
+# 7. O Front Precisa de Três Mudanças
 
-Independentemente da plataforma escolhida, sair do `localhost` exige três ajustes. Eles são os mesmos nos dois caminhos das seções 9 e 10.
+Independentemente da plataforma escolhida, sair do `localhost` exige três ajustes. Eles são os mesmos nos dois caminhos.
 
 **O endereço da API.** Localmente era `http://localhost:8000` (ou `http://backend:8000` dentro do compose). Agora é a URL pública, em HTTPS e sem porta:
 
@@ -437,86 +404,19 @@ API_URL = _config("API_URL", "http://localhost:8000").strip().rstrip("/")
 API_KEY = _config("API_KEY", "chave-local-dev").strip()
 ```
 
-**O tempo de espera precisa crescer**, pelo motivo da seção 7.2.
-
 ---
 
-# 9. Parte 3A — O Front Streamlit no Streamlit Community Cloud
+# 8. Parte 3A — O Front Streamlit no Streamlit Community Cloud
 
 Este é o caminho para a versão Streamlit do Forzy (pasta `frontend-streamlit/`).
 
-## 9.1 O que mudou do Gradio para o Streamlit
-
-Antes do deploy, vale entender o que foi reescrito — porque **quase nada foi**.
-
-| Camada | Mudou? | O que aconteceu |
-|---|---|---|
-| `providers/api_provider.py` | Pouco | Mesmas funções, mesmas rotas. Ganhou leitura de `st.secrets` e memorização de respostas |
-| `pipelines/*.py` | Pouco | Passaram a devolver `DataFrame` em vez de lista de listas, porque é o que o `st.dataframe` espera. O gráfico Plotly é idêntico |
-| `state/app_state.py` | Sim | `gr.State` deu lugar a `st.session_state` |
-| `ui/sidebar.py` | Sim | `gr.Sidebar` deu lugar a `st.sidebar` |
-| `features/*/page.py` | Sim | Reescritas — é a camada de UI, afinal |
-| **Back-end** | **Não** | **Nenhuma linha** |
-
-A arquitetura em camadas se pagou: a reescrita ficou contida nas camadas que existem justamente para mudar.
-
-### A diferença de fundo entre os dois modelos
-
-A maior adaptação não é de sintaxe, é de modelo de execução. Quase todo bug de quem vem do Gradio nasce daqui.
+## 8.1 O que mudou do Gradio para o Streamlit
 
 **No Gradio**, você monta a interface uma vez e registra eventos. Quando o usuário clica num botão, só a função daquele evento roda, e só os componentes listados em `outputs` são atualizados. O resto da tela nem é tocado.
 
 **No Streamlit**, não existem eventos. Qualquer interação — um clique, uma escolha num seletor, uma tecla num campo — reexecuta **o script inteiro**, de cima para baixo, e redesenha a tela do zero. O `st.button()` não recebe uma função: ele devolve `True` no exato rerun em que foi clicado.
 
-```python
-# Gradio: registra um callback, atualiza um componente específico
-botao.click(fn=carregar_dados, inputs=dropdown, outputs=tabela)
-
-# Streamlit: o script reexecuta e você reage ao resultado do clique
-if st.button("Carregar"):
-    tabela = carregar_dados(tag)
-```
-
-Três consequências no Forzy:
-
-**A cascata do dashboard ficou mais simples.** No Gradio eram dois eventos `.change()` para reescrever as opções dos dropdowns dependentes. No Streamlit, quando a linha do seletor de Áreas é executada, a planta escolhida logo acima já está na variável:
-
-```python
-planta = c1.selectbox("Planta", api_provider.listar_plantas())
-areas  = api_provider.listar_areas(planta)      # já usa a planta escolhida
-area   = c2.selectbox("Área", areas)
-```
-
-**O cache deixou de ser opcional.** Se o script inteiro roda de novo a cada clique, todas as chamadas HTTP da tela se repetem. Sem cache, escolher uma TAG no dashboard dispararia de novo as consultas de plantas, áreas e equipamentos — quatro requisições desnecessárias por clique, contra um serviço que hiberna. Por isso as leituras são memorizadas:
-
-```python
-@st.cache_data(ttl=120, show_spinner=False)
-def listar_todos() -> list[dict]:
-    return _get("/v1/equipamentos", feature="equipamentos") or []
-```
-
-O `ttl` (*time to live*) é o tempo, em segundos, que a resposta vale antes de ser buscada de novo. Os valores foram escolhidos pela natureza do dado: o cadastro muda pouco (120 s), a hierarquia da planta é praticamente fixa (600 s), a telemetria envelhece rápido (20 s).
-
-Escritas **nunca** são memorizadas — o `salvar()` não tem decorador. E, logo depois de gravar, o cache precisa ser descartado, senão a lista continuaria mostrando os dados antigos:
-
-```python
-sucesso, mensagem = pipeline.salvar_equipamento(...)
-if sucesso:
-    api_provider.limpar_cache()   # st.cache_data.clear()
-```
-
-**A identificação de sessão melhorou.** No Gradio, o `X-Session-Id` era um UUID por **processo**: todos os usuários do app compartilhavam o mesmo identificador. No Streamlit, cada aba do navegador tem o seu `st.session_state`, então conseguimos um identificador por **usuário**:
-
-```python
-def _session_id() -> str:
-    if "_session_id" not in st.session_state:
-        st.session_state["_session_id"] = str(uuid.uuid4())
-    return st.session_state["_session_id"]
-```
-
-No LangSmith, isso significa poder filtrar por `metadata.session_id` e reconstruir exatamente o que uma pessoa fez — o que antes era impossível.
-
-## 9.2 `st.secrets` — o `.env` da nuvem
+## 8.2 `st.secrets` — o `.env` da nuvem
 
 O Streamlit Cloud não tem arquivo `.env`. Ele injeta as configurações por um mecanismo próprio, o `st.secrets`, que lê um arquivo TOML.
 
@@ -552,7 +452,7 @@ Esse padrão de "procurar em várias fontes, com uma ordem de precedência" é c
 
 Commite um `secrets.toml.example`, com valores fictícios, para quem clonar o projeto saber o que precisa preencher — mesma ideia do `.env.example`.
 
-## 9.3 Rodando localmente antes de publicar
+## 8.3 Rodando localmente antes de publicar
 
 Não publique sem rodar. Na pasta `frontend-streamlit/`:
 
@@ -572,7 +472,7 @@ APP_VERSION=2.0.0-streamlit
 
 Percorra as quatro telas. Se tudo funcionar aqui, o deploy é quase burocracia.
 
-## 9.4 O `requirements.txt`
+## 8.4 O `requirements.txt`
 
 ```text
 streamlit==1.49.0
@@ -582,13 +482,9 @@ requests==2.34.2
 python-dotenv==1.2.3
 ```
 
-A versão do Streamlit não é arbitrária: o front usa `width="stretch"` em botões, tabelas e gráficos — o parâmetro que substituiu o antigo `use_container_width` —, disponível a partir da 1.49. Com uma versão mais antiga, o app quebra.
-
-O `pandas` entrou porque as pipelines passaram a devolver `DataFrame`. O `gradio` saiu.
-
 > **Onde colocar o arquivo:** o Streamlit Cloud procura o `requirements.txt` na mesma pasta do arquivo principal ou na raiz do repositório. Com o front numa subpasta, mantenha o arquivo **dentro dela**, ao lado do `app.py`.
 
-## 9.5 Publicando
+## 8.5 Publicando
 
 1. Faça o push do repositório para o GitHub.
 2. Acesse [share.streamlit.io](https://share.streamlit.io) e entre com a conta do GitHub.
@@ -610,7 +506,7 @@ A primeira publicação leva alguns minutos: a plataforma cria o ambiente, insta
 
 Ao final, o app responde em `https://forzy-digital-twin.streamlit.app`.
 
-## 9.6 Atualizações automáticas
+## 8.6 Atualizações automáticas
 
 O Streamlit Cloud observa o repositório: **cada push na branch publicada reimplanta o app**. Não existe botão de "publicar de novo" — o `git push` é o deploy. O Render funciona da mesma forma.
 
@@ -618,11 +514,11 @@ Os segredos são a exceção, e é importante entender por quê: eles ficam na p
 
 ---
 
-# 10. Parte 3B — O Front Gradio no Hugging Face Spaces
+# 9. Parte 3B — O Front Gradio no Hugging Face Spaces
 
 Este é o caminho para quem mantém a versão Gradio do Forzy. O SDK `gradio` **continua gratuito** — só o SDK Docker passou a exigir plano pago.
 
-## 10.1 Criando o Space
+## 9.1 Criando o Space
 
 1. Crie uma conta gratuita em [huggingface.co](https://huggingface.co).
 2. No menu do seu perfil, escolha **New Space**.
@@ -638,7 +534,7 @@ Visibility:  Public
 
 Com o SDK `gradio`, o Hugging Face instala o `requirements.txt` e executa o `app.py` sozinho — nenhum Dockerfile é necessário.
 
-## 10.2 O `README.md` do Space
+## 9.2 O `README.md` do Space
 
 Um Space é configurado por um bloco YAML no topo do `README.md`. Sem esse bloco, o deploy falha.
 
@@ -662,7 +558,7 @@ Consome a API publicada em `forzy-api.onrender.com`.
 
 **`sdk_version`** deve bater com a versão do Gradio que você testou localmente. Deixar a plataforma escolher a mais recente é pedir para o app quebrar num dia qualquer, por uma mudança de API de algum componente.
 
-## 10.3 O que ajustar no código
+## 9.3 O que ajustar no código
 
 **Segredos.** O Hugging Face injeta variáveis de ambiente, exatamente como o `--env-file` fazia. Nenhuma alteração de código é necessária. Em Settings → Variables and secrets:
 
@@ -716,7 +612,7 @@ import providers.api_provider as api_provider
 api_provider.acordar_api()
 ```
 
-## 10.4 Publicando
+## 9.4 Publicando
 
 Um Space é um repositório Git:
 
@@ -735,11 +631,11 @@ O app responde em `https://seu-usuario-forzy-app.hf.space`.
 
 ---
 
-# 11. E o CORS? E o HTTPS?
+# 10. E o CORS? E o HTTPS?
 
 Duas perguntas que sempre aparecem no primeiro deploy.
 
-## 11.1 O CORS continua não se aplicando
+## 10.1 O CORS continua não se aplicando
 
 O `main.py` do Forzy libera a origem `http://localhost:7860`. Agora o front está em `streamlit.app` ou em `hf.space`. A API vai recusar?
 
@@ -757,7 +653,7 @@ API FastAPI (Render)
 
 Então por que manter a configuração de CORS? Porque ela vai passar a valer no dia em que um cliente chamar a API **de dentro do navegador ou de um app** — que é exatamente o que acontece na aula de mobile. Guarde a lista `allow_origins`: ela vai precisar ser atualizada lá.
 
-## 11.2 HTTPS sem esforço
+## 10.2 HTTPS sem esforço
 
 As duas plataformas entregam HTTPS pronto, com certificado válido e renovado automaticamente. Você não gerou certificado, não configurou nada, não pagou nada.
 
@@ -765,7 +661,7 @@ Registre isso como um privilégio do "grátis", porque ele acaba na próxima aul
 
 ---
 
-# 12. Observabilidade Depois do Deploy
+# 11. Observabilidade Depois do Deploy
 
 Aqui as aulas de observabilidade se pagam. Você não precisa adivinhar como o Forzy se comporta no ar: você consegue ver.
 
@@ -785,9 +681,9 @@ Abra o LangSmith no projeto `forzy-producao`, use o app publicado por alguns min
 
 ---
 
-# 13. Apêndice — FastAPI num Space Gradio, sem Docker
+# 12. Apêndice — FastAPI num Space Gradio, sem Docker
 
-Para quem quiser manter tudo no Hugging Face mesmo depois da mudança de julho, existe um caminho.
+Para quem quiser manter tudo no Hugging Face mesmo, existe um caminho.
 
 Um Space com `sdk: gradio` simplesmente executa `python app.py` e espera que **alguma coisa** escute na porta 7860. Ele não verifica se o que está rodando é Gradio de fato. Então dá para colocar ali um FastAPI puro:
 
@@ -806,13 +702,13 @@ if __name__ == "__main__":
 
 Funciona, e há projetos reais usando isso. Mas leia a advertência com atenção:
 
-**Isto depende de um comportamento não documentado.** O Hugging Face não promete que um Space Gradio aceite qualquer processo — ele apenas não impede hoje. É exatamente o tipo de brecha que uma plataforma fecha quando quer, do mesmo jeito que fechou o SDK Docker em julho, sem aviso.
+**Isto depende de um comportamento não documentado.** O Hugging Face não promete que um Space Gradio aceite qualquer processo — ele apenas não impede hoje. É exatamente o tipo de brecha que uma plataforma fecha quando quer, do mesmo jeito que fechou o SDK Docker, sem aviso.
 
 Use como curiosidade e como exercício de entender o que uma plataforma realmente executa por baixo. **Não use como caminho principal de um trabalho avaliado**, e muito menos de um sistema que outra pessoa dependa.
 
 ---
 
-# 14. Roteiro de Verificação
+# 13. Roteiro de Verificação
 
 1. `https://forzy-api.onrender.com/` responde `{"status": "ok", ...}`.
 2. `/docs` abre e, com a chave de produção, `GET /v1/equipamentos` devolve os motores.
@@ -830,7 +726,7 @@ Use como curiosidade e como exercício de entender o que uma plataforma realment
 
 ---
 
-# 15. Problemas Comuns
+# 14. Problemas Comuns
 
 | Sintoma | Causa provável | Como resolver |
 |---|---|---|
@@ -848,41 +744,6 @@ Use como curiosidade e como exercício de entender o que uma plataforma realment
 | Motor cadastrado sumiu | Disco efêmero do plano gratuito | Comportamento esperado; ver a seção 7.1 |
 | Traces não chegam ao LangSmith | `LANGSMITH_*` não configuradas no painel | Conferir e reiniciar o serviço |
 | Não consegue criar Space com SDK Docker | Mudança de julho de 2026 | Usar o Render; ver a seção 1 |
-
----
-
-# 16. Exercícios
-
-**1. Sem Docker contra com Docker.** Você tem os dois serviços no ar. Faça dez chamadas a cada um com `curl -w "%{time_total}\n" -o /dev/null -s` e compare os tempos. Depois compare os tempos de **build** nos logs. Qual dos dois é mais rápido para construir? E para responder? Explique a diferença.
-
-**2. Quebrando de propósito.** No serviço Docker, volte o `CMD` para a forma exec com `${PORT}` dentro. Publique e leia os logs. Qual mensagem exata aparece? Por que o erro acontece no uvicorn e não no Docker?
-
-**3. O erro mais comum.** Altere a `API_KEY` do serviço para um valor diferente do que está no front. Abra o app publicado e descreva: qual mensagem o usuário vê? Ela é suficiente para alguém de fora entender o que houve? Se não for, melhore o tratamento do caso `401` no `api_provider` e publique de novo.
-
-**4. Medindo a hibernação.** Deixe o serviço sem acesso por 20 minutos. Cronometre a primeira requisição (`curl -w "%{time_total}\n" -o /dev/null -s <url>`) e uma segunda logo em seguida. Anote os dois tempos. O `_TIMEOUT_ACORDAR` de 75 s é suficiente, exagerado ou insuficiente?
-
-**5. Persistência.** O `motor.db` é efêmero no plano gratuito. Descreva — sem implementar — como resolver isso de três formas: disco anexado pago, banco gerenciado externo e servidor próprio. Para cada uma, aponte um custo e uma desvantagem.
-
-**6. Dois fronts, uma API.** Publique as duas versões do front apontando para a mesma API. No LangSmith, filtre por `metadata.client_platform` e compare: número de requisições por feature e latência média. As duas fazem o mesmo número de chamadas para a mesma tarefa? Se não, por quê?
-
-**7. O custo de não ter cache.** Comente o decorador `@st.cache_data` da função `listar_todos`, publique e navegue pelo app. Conte os traces de `endpoint_listar_equipamentos` antes e depois. Quantas requisições o cache poupou? Em que situação o cache seria um problema, e não uma vantagem?
-
-**8. Portabilidade.** Sem publicar nada, escreva o que seria necessário para mover a API do Render para o Koyeb, em cada um dos dois modos. Qual dos dois dá menos trabalho? Relacione a resposta com a seção 1.
-
----
-
-# 17. O que Você Tem ao Final desta Aula
-
-- Um endereço HTTPS público para a API do Forzy, com Swagger acessível e endpoints protegidos por chave.
-- A **mesma API publicada de duas formas** — runtime nativo e Docker — e clareza sobre o que cada modo entrega e cobra.
-- Um endereço HTTPS público para a interface, apontando para essa API.
-- Segredos configurados nos painéis das plataformas, fora do repositório.
-- Deploy automático: `git push` publica a versão nova nas duas plataformas.
-- Tratamento explícito da hibernação, comunicado ao usuário em vez de escondido atrás de um erro.
-- Traces de produção separados dos de desenvolvimento, identificados por cliente, feature, sessão e versão.
-- Duas interfaces diferentes consumindo a mesma API — a demonstração prática de que o front é substituível e a API é o produto.
-- Clareza sobre as três limitações que você aceitou: disco efêmero, hibernação e ausência de controle de rede. São elas que motivam a próxima aula, sobre AWS.
-- E uma lição que não estava no plano: a plataforma gratuita de hoje pode ser a plataforma paga de amanhã, e a defesa contra isso é manter a aplicação portável.
 
 ---
 
