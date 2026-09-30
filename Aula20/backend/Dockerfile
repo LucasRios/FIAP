@@ -27,13 +27,15 @@ RUN chown forzy:forzy /app
 # 8. A partir daqui, tudo roda como o usuário forzy
 USER forzy
 
-# 9. Documenta a porta em que a API escuta
-EXPOSE 8000
+# Porta padrão para uso local; a plataforma sobrescreve quando quiser outra
+ENV PORT=8000
 
-# 10. Verificação de saúde: o Docker chama a rota "/" periodicamente
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=5 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
+  CMD python -c "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ['PORT'] + '/')" || exit 1
 
- 
-# 11. Comando executado quando o container inicia
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Forma shell (sh -c): necessária para que ${PORT} seja expandido.
+# O `exec` faz o uvicorn substituir o shell e virar o processo principal,
+# de modo que ele receba o sinal de encerramento quando a plataforma o desligar.
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT}"]
+
+  
