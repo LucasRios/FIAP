@@ -140,8 +140,6 @@ Name:              forzy-api
 Language:          Python 3
 Branch:            main
 Root Directory:    backend
-Build Command:     pip install -r requirements.txt
-Start Command:     uvicorn main:app --host 0.0.0.0 --port $PORT
 Instance Type:     Free
 Health Check Path: /
 ```
@@ -149,13 +147,6 @@ Health Check Path: /
 Cinco campos merecem explicação.
 
 **`Root Directory: backend`** — diz ao Render que a aplicação vive numa subpasta. Sem isso, ele procuraria o `requirements.txt` na raiz do repositório e não encontraria nada.
-
-**`Build Command`** — o que roda uma vez, na construção. É o mesmo `pip install` que você digita localmente. O Render cria o ambiente virtual sozinho.
-
-**`Start Command`** — o que roda para servir a aplicação. Repare em duas coisas:
-
-- `--host 0.0.0.0`, pelo mesmo motivo da aula anterior: escutar só em `127.0.0.1` torna o processo inalcançável de fora.
-- `--port $PORT`, que é novo. O Render **escolhe** a porta e a entrega numa variável de ambiente chamada `PORT`. Sua aplicação não decide em qual porta vai rodar — ela obedece. Uma porta fixa como `--port 8000` faz o serviço subir e nunca receber tráfego, porque o roteador da plataforma está encaminhando para outro lugar.
 
 **`Health Check Path: /`** — o Render chama essa rota periodicamente para saber se a aplicação está viva. É exatamente o mesmo papel do `HEALTHCHECK` do Dockerfile, agora feito pela plataforma. Usamos `/` porque é a única rota do Forzy que não exige `X-API-Key`.
 
