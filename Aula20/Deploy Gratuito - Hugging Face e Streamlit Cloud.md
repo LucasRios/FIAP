@@ -140,6 +140,7 @@ Name:              forzy-api
 Language:          Python 3
 Branch:            main
 Root Directory:    backend
+Start Command:     uvicorn main:app --host 0.0.0.0 --port $PORT
 Instance Type:     Free
 Health Check Path: /
 ```
