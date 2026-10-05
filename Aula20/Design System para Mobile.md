@@ -273,7 +273,7 @@ Não é preciso decorar a fórmula, e sim as consequências:
 - **Ações relacionadas ficam juntas.** Os botões "Painel" e "Ficha" dentro do card do motor estão a centímetros do nome do motor que o usuário acabou de ler. Na versão original, ficavam abaixo de uma tabela de 20 linhas.
 - **Bordas da tela são alvos "infinitos" em uma direção** — e é por isso que barras de navegação ficam coladas à borda inferior.
 
-## 5.3 A zona do polegar
+## 5.3 A zona do polegar (Thumb Zone)
 
 Steven Hoober observou 1.333 pessoas usando celulares em ruas, aeroportos, pontos de ônibus e cafés. Ao tocar a tela, **49%** usavam uma mão só, **36%** seguravam o aparelho numa mão e tocavam com a outra, e **15%** usavam as duas mãos. Ele também registrou que as pessoas **mudam de pegada o tempo todo**, às vezes a cada poucos segundos, conforme a tarefa.
 
