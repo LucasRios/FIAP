@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PWA mínimo</title>
+
+  <!-- 1. O manifesto: diz ao sistema como o app se apresenta quando instalado -->
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- 2. Cor da barra do sistema (Android) e ícone da Tela de Início (iOS) -->
+  <meta name="theme-color" content="#1E40AF">
+  <link rel="apple-touch-icon" href="icones/apple-touch-icon.png">
+
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; line-height: 1.5; }
+    code { background: #EEF0F3; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>PWA mínimo</h1>
+  <p>Página gerada às <strong id="hora"></strong>.</p>
+  <p id="estado">Verificando o service worker…</p>
+
+  <script>
+    // A hora muda a cada vez que a página vem da REDE. Se ela não mudar
+    // depois de recarregar, a página veio de um cache — um sinal de alerta.
+    document.getElementById("hora").textContent = new Date().toLocaleTimeString("pt-BR");
+
+    const estado = document.getElementById("estado");
+
+    // 3. Registro do service worker
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js")
+        .then((registro) => {
+          estado.textContent = "Service worker registrado. Escopo: " + registro.scope;
+          console.log("[página] registrado, escopo:", registro.scope);
+          console.log("[página] esta página é controlada?", Boolean(navigator.serviceWorker.controller));
+        })
+        .catch((erro) => {
+          estado.textContent = "Falha ao registrar: " + erro;
+        });
+    } else {
+      estado.textContent = "Este navegador não tem service worker (ou a página não é HTTPS).";
+    }
+  </script>
+</body>
+</html>
