@@ -1,0 +1,6 @@
+{
+  "motor": "MTR-012",
+  "temperatura_c": 71.4,
+  "vibracao_mms": 3.1,
+  "observacao": "Arquivo estático: a hora que importa é a do cabeçalho Date da resposta."
+}

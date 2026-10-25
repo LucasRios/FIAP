@@ -15,12 +15,33 @@
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; line-height: 1.5; }
     code { background: #EEF0F3; padding: 2px 6px; border-radius: 4px; }
+      button { min-height: 48px; padding: 0 18px; margin: 4px 8px 4px 0; font: inherit; border: 0;
+             border-radius: 8px; background: #1E40AF; color: #fff; cursor: pointer; }
+    button.secundario { background: #E5E7EB; color: #111827; }
+    #rede { font-weight: 600; }
+    #registro { list-style: none; padding: 0; margin: 16px 0 0; }
+    #registro li { padding: 10px 12px; margin-bottom: 8px; border-radius: 8px; background: #F3F4F6; }
+    #registro li.rede  { border-left: 6px solid #16A34A; }
+    #registro li.cache { border-left: 6px solid #D97706; background: #FFFBEB; }
+    #registro li.erro  { border-left: 6px solid #DC2626; background: #FEF2F2; }
   </style>
+
 </head>
 <body>
-  <h1>PWA mínimo</h1>
+  <h1>PWA mínimo.</h1>
   <p>Página gerada às <strong id="hora"></strong>.</p>
   <p id="estado">Verificando o service worker…</p>
+
+
+  <!-- 4. Simular GETs: pedidos que NÃO são navegação, como os de uma API -->
+  <section>
+    <h2>Simular GETs</h2>
+    <p>Conexão segundo o navegador: <span id="rede"></span></p>
+    <button id="get-rede">GET só rede</button>
+    <button id="get-cache">GET rede primeiro, com cópia</button>
+    <button id="limpar" class="secundario">Limpar</button>
+    <ol id="registro"></ol>
+  </section>
 
   <script>
     // A hora muda a cada vez que a página vem da REDE. Se ela não mudar
@@ -43,6 +64,49 @@
     } else {
       estado.textContent = "Este navegador não tem service worker (ou a página não é HTTPS).";
     }
+
+    // 4. Simular GETs ----------------------------------------------------------
+    // "rede":  o service worker não toca no pedido → sem rede, o fetch FALHA.
+    // "cache": o service worker tenta a rede e guarda uma cópia; sem rede,
+    //          devolve a cópia MARCADA (X-Origem: cache) — dado velho, avisado.
+    const registro = document.getElementById("registro");
+    const rede = document.getElementById("rede");
+
+    const mostrarRede = () => { rede.textContent = navigator.onLine ? "online" : "offline"; };
+    addEventListener("online", mostrarRede);
+    addEventListener("offline", mostrarRede);
+    mostrarRede();
+
+    function registrar(classe, texto) {
+      const item = document.createElement("li");
+      item.className = classe;
+      item.textContent = texto;            // textContent: nada de HTML vindo de fora
+      registro.prepend(item);              // o mais recente em cima
+    }
+
+    async function fazerGet(estrategia) {
+      const agora = new Date();
+      const hora = agora.toLocaleTimeString("pt-BR");
+      const controlada = navigator.serviceWorker && navigator.serviceWorker.controller ? "sim" : "não";
+      try {
+        // no-store: nem o cache HTTP do navegador responde — só a rede ou o service worker
+        const resposta = await fetch(`dados.json?estrategia=${estrategia}`, { cache: "no-store" });
+        const dados = await resposta.json();
+        const doCache = resposta.headers.get("X-Origem") === "cache";
+        const dataServidor = new Date(resposta.headers.get("Date"));
+        const idade = Math.round((agora - dataServidor) / 1000);
+        registrar(doCache ? "cache" : "rede",
+          `${hora} · GET ${estrategia} · ${resposta.status} · ${doCache ? "⚠ CÓPIA DO CACHE" : "rede"} · ` +
+          `servidor respondeu às ${dataServidor.toLocaleTimeString("pt-BR")}` +
+          (doCache ? ` (há ${idade} s)` : "") + ` · ${dados.motor} ${dados.temperatura_c} °C · SW controla: ${controlada}`);
+      } catch (erro) {
+        registrar("erro", `${hora} · GET ${estrategia} · FALHOU: ${erro.message} · SW controla: ${controlada}`);
+      }
+    }
+
+    document.getElementById("get-rede").addEventListener("click", () => fazerGet("rede"));
+    document.getElementById("get-cache").addEventListener("click", () => fazerGet("cache"));
+    document.getElementById("limpar").addEventListener("click", () => registro.replaceChildren());
   </script>
 </body>
 </html>
